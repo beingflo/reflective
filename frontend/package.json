@@ -1,0 +1,32 @@
+{
+  "name": "thesedays",
+  "version": "0.0.1",
+  "author": "Florian Marending",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview",
+    "eslint": "eslint src",
+    "eslint:fix": "eslint src --fix"
+  },
+  "devDependencies": {
+    "@types/node": "18.19.6",
+    "@typescript-eslint/eslint-plugin": "5.62.0",
+    "@typescript-eslint/parser": "5.62.0",
+    "autoprefixer": "10.4.16",
+    "cssnano": "6.0.3",
+    "cssnano-preset-advanced": "6.0.3",
+    "eslint": "8.56.0",
+    "eslint-config-prettier": "8.10.0",
+    "eslint-plugin-prettier": "4.2.1",
+    "postcss": "8.4.33",
+    "prettier": "2.8.8",
+    "tailwindcss": "3.4.1",
+    "typescript": "5.3.3",
+    "vite": "4.5.1",
+    "vite-plugin-solid": "2.8.0"
+  },
+  "dependencies": {
+    "solid-js": "1.8.11"
+  }
+}
