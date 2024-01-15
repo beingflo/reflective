@@ -1,4 +1,4 @@
-use axum::{http::StatusCode, Extension, Json};
+use axum::{http::StatusCode, Extension};
 use serde::{Deserialize, Serialize};
 
 use crate::State;
