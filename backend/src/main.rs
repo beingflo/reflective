@@ -1,4 +1,5 @@
 mod auth;
+mod error;
 mod migration;
 
 use std::sync::Arc;
