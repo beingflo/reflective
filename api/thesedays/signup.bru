@@ -1,0 +1,18 @@
+meta {
+  name: signup
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:3001/auth/signup
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "username": "test",
+    "password": "test"
+  }
+}
