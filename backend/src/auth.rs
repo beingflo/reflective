@@ -1,5 +1,6 @@
 use crate::error::AppError;
 use axum::{http::StatusCode, Extension, Json};
+use axum_extra::extract::{cookie::Cookie, CookieJar};
 use serde::{Deserialize, Serialize};
 
 use crate::State;
@@ -38,8 +39,9 @@ pub async fn signup(
 
 pub async fn login(
     Extension(state): Extension<State>,
+    jar: CookieJar,
     Json(user): Json<User>,
-) -> Result<StatusCode, AppError> {
+) -> Result<(CookieJar, StatusCode), AppError> {
     let connection = state.conn.lock().await;
 
     let mut stmt = connection
@@ -52,12 +54,13 @@ pub async fn login(
             username: row.get(0)?,
             password: row.get(1)?,
         },
-        None => return Ok(StatusCode::UNAUTHORIZED),
+        None => unimplemented!(),
     };
 
     if user.password == db_user.password {
-        Ok(StatusCode::OK)
+        let jar = jar.add(Cookie::new("session_token", "test"));
+        Ok((jar, StatusCode::OK))
     } else {
-        Ok(StatusCode::UNAUTHORIZED)
+        unimplemented!()
     }
 }
