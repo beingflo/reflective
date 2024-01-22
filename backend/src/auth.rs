@@ -25,7 +25,7 @@ pub async fn signup(
 
     // User already exists
     if let Some(_) = rows.next()? {
-        return Ok(StatusCode::CONFLICT);
+        return Err(AppError::Status(StatusCode::CONFLICT));
     }
 
     // No salting for now, randomly generated password anyway
@@ -61,6 +61,6 @@ pub async fn login(
         let jar = jar.add(Cookie::new("session_token", "test"));
         Ok((jar, StatusCode::OK))
     } else {
-        unimplemented!()
+        Err(AppError::Status(StatusCode::UNAUTHORIZED))
     }
 }
