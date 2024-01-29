@@ -54,7 +54,7 @@ pub async fn login(
             username: row.get(0)?,
             password: row.get(1)?,
         },
-        None => unimplemented!(),
+        None => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
     };
 
     if user.password == db_user.password {
