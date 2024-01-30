@@ -1,15 +1,20 @@
 mod auth;
 mod error;
 mod migration;
+mod user;
 
 use std::sync::Arc;
 
 use auth::{login, signup};
-use axum::{routing::post, Extension, Router};
+use axum::{
+    routing::{patch, post},
+    Extension, Router,
+};
 use dotenv::dotenv;
 use migration::apply_migrations;
 use rusqlite::Connection;
 use tokio::sync::Mutex;
+use user::update_config;
 
 #[derive(Clone)]
 pub struct State {
@@ -27,6 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/auth/signup", post(signup))
         .route("/auth/login", post(login))
+        .route("/user/config", patch(update_config))
         .layer(Extension(State {
             conn: Arc::new(Mutex::new(conn)),
         }));

@@ -1,0 +1,18 @@
+meta {
+  name: update_config
+  type: http
+  seq: 3
+}
+
+post {
+  url: http://localhost:3001/auth/signup
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "username": "test2",
+    "password": "test"
+  }
+}
