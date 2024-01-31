@@ -1,9 +1,14 @@
 use crate::error::AppError;
-use axum::{http::StatusCode, Extension, Json};
+use axum::{
+    async_trait,
+    extract::{FromRequestParts, State},
+    http::{request::Parts, StatusCode},
+    Json,
+};
 use axum_extra::extract::{cookie::Cookie, CookieJar};
 use serde::{Deserialize, Serialize};
 
-use crate::State;
+use crate::AppState;
 
 #[derive(Serialize, Deserialize)]
 pub struct User {
@@ -11,8 +16,38 @@ pub struct User {
     password: String,
 }
 
+pub struct AuthenticatedUser {
+    pub id: u64,
+    pub username: String,
+}
+
+#[async_trait]
+impl FromRequestParts<AppState> for AuthenticatedUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let cookies = match CookieJar::from_request_parts(parts, state).await {
+            Ok(cookies) => cookies,
+            Err(_) => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
+        };
+
+        let token = match cookies.get("token") {
+            Some(token) => token,
+            None => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
+        };
+
+        return Ok(AuthenticatedUser {
+            id: 123,
+            username: "florian".to_string(),
+        });
+    }
+}
+
 pub async fn signup(
-    Extension(state): Extension<State>,
+    State(state): State<AppState>,
     Json(user): Json<User>,
 ) -> Result<StatusCode, AppError> {
     let connection = state.conn.lock().await;
@@ -38,8 +73,8 @@ pub async fn signup(
 }
 
 pub async fn login(
-    Extension(state): Extension<State>,
     jar: CookieJar,
+    State(state): State<AppState>,
     Json(user): Json<User>,
 ) -> Result<(CookieJar, StatusCode), AppError> {
     let connection = state.conn.lock().await;
@@ -58,7 +93,7 @@ pub async fn login(
     };
 
     if user.password == db_user.password {
-        let jar = jar.add(Cookie::new("session_token", "test"));
+        let jar = jar.add(Cookie::build(("token", "test")).path("/").http_only(true));
         Ok((jar, StatusCode::OK))
     } else {
         Err(AppError::Status(StatusCode::UNAUTHORIZED))

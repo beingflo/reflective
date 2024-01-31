@@ -1,8 +1,8 @@
-use crate::error::AppError;
-use axum::{http::StatusCode, Extension, Json};
+use crate::{auth::AuthenticatedUser, error::AppError};
+use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 
-use crate::State;
+use crate::AppState;
 
 #[derive(Serialize, Deserialize)]
 pub struct S3Data {
@@ -13,7 +13,8 @@ pub struct S3Data {
 }
 
 pub async fn update_config(
-    Extension(state): Extension<State>,
+    user: AuthenticatedUser,
+    State(state): State<AppState>,
     Json(data): Json<S3Data>,
 ) -> Result<StatusCode, AppError> {
     let connection = state.conn.lock().await;

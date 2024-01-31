@@ -4,15 +4,17 @@ meta {
   seq: 3
 }
 
-post {
-  url: http://localhost:3001/auth/signup
+patch {
+  url: http://localhost:3001/user/config
   body: json
   auth: none
 }
 
 body:json {
   {
-    "username": "test2",
-    "password": "test"
+    "endpoint": "test",
+    "region": "test",
+    "access_key": "token",
+    "secret_key": "hello"
   }
 }

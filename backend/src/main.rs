@@ -8,7 +8,7 @@ use std::sync::Arc;
 use auth::{login, signup};
 use axum::{
     routing::{patch, post},
-    Extension, Router,
+    Router,
 };
 use dotenv::dotenv;
 use migration::apply_migrations;
@@ -17,7 +17,7 @@ use tokio::sync::Mutex;
 use user::update_config;
 
 #[derive(Clone)]
-pub struct State {
+pub struct AppState {
     conn: Arc<Mutex<Connection>>,
 }
 
@@ -33,9 +33,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/auth/signup", post(signup))
         .route("/auth/login", post(login))
         .route("/user/config", patch(update_config))
-        .layer(Extension(State {
+        .with_state(AppState {
             conn: Arc::new(Mutex::new(conn)),
-        }));
+        });
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await.unwrap();
     axum::serve(listener, app).await.unwrap();
