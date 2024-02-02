@@ -1,4 +1,4 @@
-use crate::error::AppError;
+use crate::{error::AppError, utils::get_auth_token};
 use axum::{
     async_trait,
     extract::{FromRequestParts, State},
@@ -19,6 +19,11 @@ pub struct User {
     password: String,
 }
 
+pub struct DBUser {
+    id: u64,
+    password: String,
+}
+
 pub struct AuthenticatedUser {
     pub id: u64,
     pub username: String,
@@ -32,6 +37,8 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
+        let connection = state.conn.lock().await;
+
         let cookies = match CookieJar::from_request_parts(parts, state).await {
             Ok(cookies) => cookies,
             Err(_) => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
@@ -42,10 +49,27 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             None => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
         };
 
-        return Ok(AuthenticatedUser {
-            id: 123,
-            username: "florian".to_string(),
-        });
+        let mut stmt = connection
+            .prepare(
+                "
+                    SELECT users.id, users.username 
+                    FROM users INNER JOIN tokens ON tokens.user_id = users.id 
+                    WHERE tokens.token = ?1
+                ",
+            )
+            .unwrap();
+
+        let mut rows = stmt.query([token.value()]).unwrap();
+
+        let user = match rows.next()? {
+            Some(row) => AuthenticatedUser {
+                id: row.get(0)?,
+                username: row.get(1)?,
+            },
+            None => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
+        };
+
+        return Ok(user);
     }
 }
 
@@ -87,13 +111,13 @@ pub async fn login(
     let connection = state.conn.lock().await;
 
     let mut stmt = connection
-        .prepare("SELECT username, password FROM users WHERE username = ?1")
+        .prepare("SELECT id, password FROM users WHERE username = ?1")
         .unwrap();
     let mut rows = stmt.query([user.username]).unwrap();
 
     let db_user = match rows.next()? {
-        Some(row) => User {
-            username: row.get(0)?,
+        Some(row) => DBUser {
+            id: row.get(0)?,
             password: row.get(1)?,
         },
         None => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
@@ -105,6 +129,17 @@ pub async fn login(
         Ok(true) => (),
     }
 
-    let jar = jar.add(Cookie::build(("token", "test")).path("/").http_only(true));
+    let auth_token = get_auth_token();
+
+    connection.execute(
+        "INSERT INTO tokens (token, user_id) VALUES (?1, ?2)",
+        (&auth_token, &db_user.id),
+    )?;
+
+    let jar = jar.add(
+        Cookie::build(("token", auth_token))
+            .path("/")
+            .http_only(true),
+    );
     Ok((jar, StatusCode::OK))
 }

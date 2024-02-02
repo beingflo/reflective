@@ -19,11 +19,8 @@ pub async fn update_config(
 ) -> Result<StatusCode, AppError> {
     let connection = state.conn.lock().await;
 
-    //TODO read user from cookie / session store
-    let user = "test";
-
     let mut stmt = connection
-        .prepare("UPDATE users SET endpoint = ?1, region = ?2, access_key = ?3, secret_key = ?4 WHERE username = ?5")
+        .prepare("UPDATE users SET endpoint = ?1, region = ?2, access_key = ?3, secret_key = ?4 WHERE id = ?5")
         .unwrap();
 
     stmt.execute([
@@ -31,7 +28,7 @@ pub async fn update_config(
         data.region,
         data.access_key,
         data.secret_key,
-        user.into(),
+        user.id.to_string(),
     ])?;
 
     Ok(StatusCode::OK)

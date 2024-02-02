@@ -2,6 +2,7 @@ mod auth;
 mod error;
 mod migration;
 mod user;
+mod utils;
 
 use std::sync::Arc;
 
