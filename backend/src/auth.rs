@@ -6,9 +6,12 @@ use axum::{
     Json,
 };
 use axum_extra::extract::{cookie::Cookie, CookieJar};
+use bcrypt::{hash, verify};
 use serde::{Deserialize, Serialize};
 
 use crate::AppState;
+
+const BCRYPT_COST: u32 = 12;
 
 #[derive(Serialize, Deserialize)]
 pub struct User {
@@ -63,11 +66,14 @@ pub async fn signup(
         return Err(AppError::Status(StatusCode::CONFLICT));
     }
 
-    // TODO
-    // No salting for now, randomly generated password anyway
+    let password = match hash(user.password, BCRYPT_COST) {
+        Ok(pw) => pw,
+        Err(_) => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
+    };
+
     connection.execute(
         "INSERT INTO users (username, password) VALUES (?1, ?2)",
-        (&user.username, user.password),
+        (&user.username, password),
     )?;
 
     Ok(StatusCode::OK)
@@ -93,10 +99,12 @@ pub async fn login(
         None => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
     };
 
-    if user.password == db_user.password {
-        let jar = jar.add(Cookie::build(("token", "test")).path("/").http_only(true));
-        Ok((jar, StatusCode::OK))
-    } else {
-        Err(AppError::Status(StatusCode::UNAUTHORIZED))
+    match verify(user.password, &db_user.password) {
+        Err(_) => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
+        Ok(false) => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
+        Ok(true) => (),
     }
+
+    let jar = jar.add(Cookie::build(("token", "test")).path("/").http_only(true));
+    Ok((jar, StatusCode::OK))
 }
