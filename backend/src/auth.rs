@@ -63,6 +63,7 @@ pub async fn signup(
         return Err(AppError::Status(StatusCode::CONFLICT));
     }
 
+    // TODO
     // No salting for now, randomly generated password anyway
     connection.execute(
         "INSERT INTO users (username, password) VALUES (?1, ?2)",
