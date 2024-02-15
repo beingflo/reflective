@@ -1,5 +1,6 @@
 mod auth;
 mod error;
+mod image;
 mod migration;
 mod user;
 mod utils;
@@ -12,6 +13,7 @@ use axum::{
     Router,
 };
 use dotenv::dotenv;
+use image::upload_images;
 use migration::apply_migrations;
 use rusqlite::Connection;
 use tokio::sync::Mutex;
@@ -34,6 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/auth/signup", post(signup))
         .route("/auth/login", post(login))
         .route("/user/config", patch(update_config))
+        .route("/images/upload", post(upload_images))
         .with_state(AppState {
             conn: Arc::new(Mutex::new(conn)),
         });

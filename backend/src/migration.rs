@@ -22,6 +22,16 @@ pub fn apply_migrations(connection: &mut Connection) {
                     REFERENCES users (id) 
             );",
         ),
+        M::up(
+            "CREATE TABLE images (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                filename TEXT NOT NULL,
+                metadata TEXT,
+                user_id INTEGER NOT NULL,
+                FOREIGN KEY (user_id)
+                    REFERENCES users (id) 
+            );",
+        ),
     ]);
 
     migrations.to_latest(connection).unwrap();
