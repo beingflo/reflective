@@ -32,10 +32,10 @@ pub async fn upload_images(
 
     let mut stmt = connection.prepare(
         "
-                SELECT config 
-                FROM users 
-                WHERE id = ?1
-            ",
+            SELECT config 
+            FROM users 
+            WHERE id = ?1
+        ",
     )?;
 
     let mut rows = stmt.query([user.id])?;
@@ -92,4 +92,86 @@ pub async fn upload_images(
     }
 
     Ok((StatusCode::OK, Json(files)))
+}
+
+pub async fn get_images(
+    user: AuthenticatedUser,
+    State(state): State<AppState>,
+) -> Result<(StatusCode, Json<Vec<FileGroup>>), AppError> {
+    let connection = state.conn.lock().await;
+
+    let mut stmt = connection.prepare(
+        "
+            SELECT filename_small, filename_medium, filename_original 
+            FROM images
+            WHERE user_id = ?1
+        ",
+    )?;
+
+    let file_groups = stmt.query_map([user.id], |row| {
+        Ok(FileGroup {
+            small: row.get(0)?,
+            medium: row.get(1)?,
+            original: row.get(2)?,
+        })
+    })?;
+
+    let mut stmt = connection.prepare(
+        "
+            SELECT config 
+            FROM users 
+            WHERE id = ?1
+        ",
+    )?;
+
+    let mut rows = stmt.query([user.id])?;
+
+    let config: Option<String> = match rows.next()? {
+        Some(row) => row.get(0)?,
+        None => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
+    };
+
+    let config: S3Data = match config {
+        Some(c) => serde_json::from_str(&c)?,
+        None => return Err(AppError::Status(StatusCode::NOT_FOUND)),
+    };
+
+    let bucket_name = config.bucket;
+    let region = s3::Region::Custom {
+        region: config.region,
+        endpoint: config.endpoint,
+    };
+    let credentials = Credentials::new(
+        Some(&config.access_key),
+        Some(&config.secret_key),
+        None,
+        None,
+        None,
+    )?;
+
+    let bucket = Bucket::new(&bucket_name, region, credentials)?;
+
+    let mut links = Vec::new();
+    for group in file_groups {
+        if let Ok(group) = group {
+            let url_small =
+                bucket.presign_get(format!("/{}", group.small), UPLOAD_LINK_TIMEOUT_SEC, None)?;
+            let url_medium =
+                bucket.presign_get(format!("/{}", group.medium), UPLOAD_LINK_TIMEOUT_SEC, None)?;
+            let url_original = bucket.presign_get(
+                format!("/{}", group.original),
+                UPLOAD_LINK_TIMEOUT_SEC,
+                None,
+            )?;
+            links.push(FileGroup {
+                small: url_small,
+                medium: url_medium,
+                original: url_original,
+            });
+        } else {
+            return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR));
+        }
+    }
+
+    Ok((StatusCode::OK, Json(links)))
 }

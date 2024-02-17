@@ -9,11 +9,11 @@ use std::sync::Arc;
 
 use auth::{login, signup};
 use axum::{
-    routing::{patch, post},
+    routing::{get, patch, post},
     Router,
 };
 use dotenv::dotenv;
-use image::upload_images;
+use image::{get_images, upload_images};
 use migration::apply_migrations;
 use rusqlite::Connection;
 use tokio::sync::Mutex;
@@ -37,6 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/auth/login", post(login))
         .route("/user/config", patch(update_config))
         .route("/images/upload", post(upload_images))
+        .route("/images", get(get_images))
         .with_state(AppState {
             conn: Arc::new(Mutex::new(conn)),
         });
