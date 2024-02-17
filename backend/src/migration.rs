@@ -8,10 +8,7 @@ pub fn apply_migrations(connection: &mut Connection) {
                 id INTEGER PRIMARY KEY AUTOINCREMENT, 
                 username TEXT NOT NULL,
                 password TEXT NOT NULL,
-                endpoint TEXT,
-                region TEXT,
-                access_key TEXT,
-                secret_key TEXT
+                config TEXT
             );",
         ),
         M::up(

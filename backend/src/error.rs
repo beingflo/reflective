@@ -11,6 +11,10 @@ pub enum AppError {
     Status(StatusCode),
     #[error("DB error {0}")]
     DBError(#[from] Error),
+    #[error("Serde error {0}")]
+    SerdeError(#[from] serde_json::Error),
+    #[error("S3 error {0}")]
+    S3Error(#[from] s3::error::S3Error),
 }
 
 impl IntoResponse for AppError {
@@ -18,6 +22,12 @@ impl IntoResponse for AppError {
         match self {
             AppError::Status(code) => code.into_response(),
             AppError::DBError(error) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+            }
+            AppError::SerdeError(error) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+            }
+            AppError::S3Error(error) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
             }
         }
