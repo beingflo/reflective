@@ -84,6 +84,11 @@ pub async fn upload_images(
             medium: url_medium,
             original: url_original,
         });
+
+        connection.execute(
+            "INSERT INTO images (filename_small, filename_medium, filename_original, user_id) VALUES (?1, ?2, ?3, ?4)",
+            (&small, &medium, &original, &user.id),
+        )?;
     }
 
     Ok((StatusCode::OK, Json(files)))
