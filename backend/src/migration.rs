@@ -31,5 +31,11 @@ pub fn apply_migrations(connection: &mut Connection) {
         ),
     ]);
 
-    migrations.to_latest(connection).unwrap();
+    match migrations.to_latest(connection) {
+        Ok(_) => {}
+        Err(error) => {
+            println!("Error applying migrations: {}", error);
+            panic!();
+        }
+    }
 }

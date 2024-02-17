@@ -30,15 +30,13 @@ pub async fn upload_images(
     }
     let connection = state.conn.lock().await;
 
-    let mut stmt = connection
-        .prepare(
-            "
+    let mut stmt = connection.prepare(
+        "
                 SELECT config 
                 FROM users 
                 WHERE id = ?1
             ",
-        )
-        .unwrap();
+    )?;
 
     let mut rows = stmt.query([user.id])?;
 
@@ -63,8 +61,7 @@ pub async fn upload_images(
         None,
         None,
         None,
-    )
-    .unwrap();
+    )?;
 
     let bucket = Bucket::new(&bucket_name, region, credentials)?;
 

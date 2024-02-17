@@ -20,9 +20,7 @@ pub async fn update_config(
 ) -> Result<StatusCode, AppError> {
     let connection = state.conn.lock().await;
 
-    let mut stmt = connection
-        .prepare("UPDATE users SET config = ?1 WHERE id = ?2")
-        .unwrap();
+    let mut stmt = connection.prepare("UPDATE users SET config = ?1 WHERE id = ?2")?;
 
     stmt.execute([serde_json::to_string(&data)?, user.id.to_string()])?;
 

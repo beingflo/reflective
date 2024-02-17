@@ -49,17 +49,15 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             None => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
         };
 
-        let mut stmt = connection
-            .prepare(
-                "
+        let mut stmt = connection.prepare(
+            "
                     SELECT users.id, users.username 
                     FROM users INNER JOIN tokens ON tokens.user_id = users.id 
                     WHERE tokens.token = ?1
                 ",
-            )
-            .unwrap();
+        )?;
 
-        let mut rows = stmt.query([token.value()]).unwrap();
+        let mut rows = stmt.query([token.value()])?;
 
         let user = match rows.next()? {
             Some(row) => AuthenticatedUser {
@@ -79,11 +77,10 @@ pub async fn signup(
 ) -> Result<StatusCode, AppError> {
     let connection = state.conn.lock().await;
 
-    let mut stmt = connection
-        .prepare("SELECT username, password FROM users WHERE username = ?1")
-        .unwrap();
+    let mut stmt =
+        connection.prepare("SELECT username, password FROM users WHERE username = ?1")?;
 
-    let mut rows = stmt.query([&user.username]).unwrap();
+    let mut rows = stmt.query([&user.username])?;
 
     // User already exists
     if let Some(_) = rows.next()? {
@@ -110,10 +107,8 @@ pub async fn login(
 ) -> Result<(CookieJar, StatusCode), AppError> {
     let connection = state.conn.lock().await;
 
-    let mut stmt = connection
-        .prepare("SELECT id, password FROM users WHERE username = ?1")
-        .unwrap();
-    let mut rows = stmt.query([user.username]).unwrap();
+    let mut stmt = connection.prepare("SELECT id, password FROM users WHERE username = ?1")?;
+    let mut rows = stmt.query([user.username])?;
 
     let db_user = match rows.next()? {
         Some(row) => DBUser {

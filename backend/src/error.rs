@@ -15,6 +15,8 @@ pub enum AppError {
     SerdeError(#[from] serde_json::Error),
     #[error("S3 error {0}")]
     S3Error(#[from] s3::error::S3Error),
+    #[error("Credentials error {0}")]
+    CredentialsError(#[from] s3::creds::error::CredentialsError),
 }
 
 impl IntoResponse for AppError {
@@ -28,6 +30,9 @@ impl IntoResponse for AppError {
                 (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
             }
             AppError::S3Error(error) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+            }
+            AppError::CredentialsError(error) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
             }
         }
