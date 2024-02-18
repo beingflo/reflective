@@ -30,24 +30,9 @@ pub async fn upload_images(
     }
     let connection = state.conn.lock().await;
 
-    let mut stmt = connection.prepare(
-        "
-            SELECT config 
-            FROM users 
-            WHERE id = ?1
-        ",
-    )?;
-
-    let mut rows = stmt.query([user.id])?;
-
-    let config: Option<String> = match rows.next()? {
-        Some(row) => row.get(0)?,
-        None => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
-    };
-
-    let config: S3Data = match config {
-        Some(c) => serde_json::from_str(&c)?,
-        None => return Err(AppError::Status(StatusCode::NOT_FOUND)),
+    let config: S3Data = match user.config {
+        Some(c) => c,
+        None => return Err(AppError::Status(StatusCode::BAD_REQUEST)),
     };
 
     let bucket_name = config.bucket;
@@ -116,23 +101,8 @@ pub async fn get_images(
         })
     })?;
 
-    let mut stmt = connection.prepare(
-        "
-            SELECT config 
-            FROM users 
-            WHERE id = ?1
-        ",
-    )?;
-
-    let mut rows = stmt.query([user.id])?;
-
-    let config: Option<String> = match rows.next()? {
-        Some(row) => row.get(0)?,
-        None => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
-    };
-
-    let config: S3Data = match config {
-        Some(c) => serde_json::from_str(&c)?,
+    let config: S3Data = match user.config {
+        Some(c) => c,
         None => return Err(AppError::Status(StatusCode::NOT_FOUND)),
     };
 
