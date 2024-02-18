@@ -4,7 +4,12 @@ use crate::{
     user::S3Data,
     utils::{get_bucket, get_file_name},
 };
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::Redirect,
+    Json,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::AppState;
@@ -90,6 +95,34 @@ pub async fn get_images(
         })
     })?;
 
+    let files = file_groups.collect::<Result<_, _>>()?;
+
+    Ok((StatusCode::OK, Json(files)))
+}
+
+pub async fn get_image(
+    user: AuthenticatedUser,
+    Path(id): Path<String>,
+    State(state): State<AppState>,
+) -> Result<Redirect, AppError> {
+    let connection = state.conn.lock().await;
+
+    let mut stmt = connection.prepare(
+        "
+            SELECT filename_small, filename_medium, filename_original 
+            FROM images
+            WHERE user_id = ?1 AND (filename_small = ?2 OR filename_medium = ?2 OR filename_original = ?2)
+        ",
+    )?;
+
+    let mut file_groups = stmt.query_map([&user.id.to_string(), &id], |row| {
+        Ok(FileGroup {
+            small: row.get(0)?,
+            medium: row.get(1)?,
+            original: row.get(2)?,
+        })
+    })?;
+
     let config: S3Data = match user.config {
         Some(c) => c,
         None => return Err(AppError::Status(StatusCode::NOT_FOUND)),
@@ -97,27 +130,23 @@ pub async fn get_images(
 
     let bucket = get_bucket(config)?;
 
-    let mut links = Vec::new();
-    for group in file_groups {
-        if let Ok(group) = group {
-            let url_small =
-                bucket.presign_get(format!("/{}", group.small), UPLOAD_LINK_TIMEOUT_SEC, None)?;
-            let url_medium =
-                bucket.presign_get(format!("/{}", group.medium), UPLOAD_LINK_TIMEOUT_SEC, None)?;
-            let url_original = bucket.presign_get(
-                format!("/{}", group.original),
-                UPLOAD_LINK_TIMEOUT_SEC,
-                None,
-            )?;
-            links.push(FileGroup {
-                small: url_small,
-                medium: url_medium,
-                original: url_original,
-            });
-        } else {
-            return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR));
+    let group = file_groups.next();
+
+    if let Some(group) = group {
+        let group = group?;
+        let mut name = "";
+        if group.small == id {
+            name = &group.small;
         }
+        if group.medium == id {
+            name = &group.medium;
+        }
+        if group.original == id {
+            name = &group.original;
+        }
+        let url = bucket.presign_get(format!("/{}", name), UPLOAD_LINK_TIMEOUT_SEC, None)?;
+        return Ok(Redirect::temporary(&url));
     }
 
-    Ok((StatusCode::OK, Json(links)))
+    return Err(AppError::Status(StatusCode::NOT_FOUND));
 }

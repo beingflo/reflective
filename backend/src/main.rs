@@ -13,7 +13,7 @@ use axum::{
     Router,
 };
 use dotenv::dotenv;
-use image::{get_images, upload_images};
+use image::{get_image, get_images, upload_images};
 use migration::apply_migrations;
 use rusqlite::Connection;
 use tokio::sync::Mutex;
@@ -38,6 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/user/config", patch(update_config))
         .route("/images/upload", post(upload_images))
         .route("/images", get(get_images))
+        .route("/images/:id", get(get_image))
         .with_state(AppState {
             conn: Arc::new(Mutex::new(conn)),
         });
