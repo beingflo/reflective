@@ -1,6 +1,10 @@
-use crate::{auth::AuthenticatedUser, error::AppError, user::S3Data, utils::get_file_name};
+use crate::{
+    auth::AuthenticatedUser,
+    error::AppError,
+    user::S3Data,
+    utils::{get_bucket, get_file_name},
+};
 use axum::{extract::State, http::StatusCode, Json};
-use s3::{creds::Credentials, Bucket};
 use serde::{Deserialize, Serialize};
 
 use crate::AppState;
@@ -35,23 +39,8 @@ pub async fn upload_images(
         None => return Err(AppError::Status(StatusCode::BAD_REQUEST)),
     };
 
-    let bucket_name = config.bucket;
-    let region = s3::Region::Custom {
-        region: config.region,
-        endpoint: config.endpoint,
-    };
-    let credentials = Credentials::new(
-        Some(&config.access_key),
-        Some(&config.secret_key),
-        None,
-        None,
-        None,
-    )?;
+    let bucket = get_bucket(config)?;
 
-    let bucket = Bucket::new(&bucket_name, region, credentials)?;
-
-    // Create data.number * 3 presigned PUT URLs
-    // Insert them into db with NULL metadata
     let mut files = Vec::new();
     for _ in 0..data.number {
         let small = get_file_name();
@@ -106,20 +95,7 @@ pub async fn get_images(
         None => return Err(AppError::Status(StatusCode::NOT_FOUND)),
     };
 
-    let bucket_name = config.bucket;
-    let region = s3::Region::Custom {
-        region: config.region,
-        endpoint: config.endpoint,
-    };
-    let credentials = Credentials::new(
-        Some(&config.access_key),
-        Some(&config.secret_key),
-        None,
-        None,
-        None,
-    )?;
-
-    let bucket = Bucket::new(&bucket_name, region, credentials)?;
+    let bucket = get_bucket(config)?;
 
     let mut links = Vec::new();
     for group in file_groups {
