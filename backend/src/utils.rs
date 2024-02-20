@@ -45,3 +45,7 @@ pub fn get_bucket(config: S3Data) -> Result<Bucket, AppError> {
 
     Ok(Bucket::new(&bucket_name, region, credentials)?)
 }
+
+pub fn format_filename(filename: &str, quality: &str) -> String {
+    format!("{}-{}", filename, quality)
+}

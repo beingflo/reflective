@@ -2,10 +2,10 @@ use crate::{
     auth::AuthenticatedUser,
     error::AppError,
     user::S3Data,
-    utils::{get_bucket, get_file_name},
+    utils::{format_filename, get_bucket, get_file_name},
 };
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::Redirect,
     Json,
@@ -48,9 +48,10 @@ pub async fn upload_images(
 
     let mut files = Vec::new();
     for _ in 0..data.number {
-        let small = get_file_name();
-        let medium = get_file_name();
-        let original = get_file_name();
+        let filename = get_file_name();
+        let small = format_filename(&filename, "small");
+        let medium = format_filename(&filename, "medium");
+        let original = format_filename(&filename, "original");
 
         let url_small = bucket.presign_put(format!("/{}", small), UPLOAD_LINK_TIMEOUT_SEC, None)?;
         let url_medium =
@@ -65,8 +66,16 @@ pub async fn upload_images(
         });
 
         connection.execute(
-            "INSERT INTO images (filename_small, filename_medium, filename_original, user_id) VALUES (?1, ?2, ?3, ?4)",
-            (&small, &medium, &original, &user.id),
+            "INSERT INTO images (filename, quality, user_id) VALUES (?1, ?2, ?3)",
+            (&filename, "small", &user.id),
+        )?;
+        connection.execute(
+            "INSERT INTO images (filename, quality, user_id) VALUES (?1, ?2, ?3)",
+            (&filename, "medium", &user.id),
+        )?;
+        connection.execute(
+            "INSERT INTO images (filename, quality, user_id) VALUES (?1, ?2, ?3)",
+            (&filename, "original", &user.id),
         )?;
     }
 
@@ -76,51 +85,47 @@ pub async fn upload_images(
 pub async fn get_images(
     user: AuthenticatedUser,
     State(state): State<AppState>,
-) -> Result<(StatusCode, Json<Vec<FileGroup>>), AppError> {
+) -> Result<(StatusCode, Json<Vec<String>>), AppError> {
     let connection = state.conn.lock().await;
 
     let mut stmt = connection.prepare(
         "
-            SELECT filename_small, filename_medium, filename_original 
+            SELECT filename 
             FROM images
-            WHERE user_id = ?1
+            WHERE user_id = ?1 AND quality = 'small'
         ",
     )?;
 
-    let file_groups = stmt.query_map([user.id], |row| {
-        Ok(FileGroup {
-            small: row.get(0)?,
-            medium: row.get(1)?,
-            original: row.get(2)?,
-        })
-    })?;
+    let files = stmt.query_map([user.id], |row| Ok(row.get(0)?))?;
 
-    let files = file_groups.collect::<Result<_, _>>()?;
+    let files = files.collect::<Result<_, _>>()?;
 
     Ok((StatusCode::OK, Json(files)))
+}
+
+#[derive(Deserialize)]
+pub struct QueryParams {
+    quality: String,
 }
 
 pub async fn get_image(
     user: AuthenticatedUser,
     Path(id): Path<String>,
+    params: Query<QueryParams>,
     State(state): State<AppState>,
 ) -> Result<Redirect, AppError> {
     let connection = state.conn.lock().await;
 
     let mut stmt = connection.prepare(
         "
-            SELECT filename_small, filename_medium, filename_original 
+            SELECT filename
             FROM images
-            WHERE user_id = ?1 AND (filename_small = ?2 OR filename_medium = ?2 OR filename_original = ?2)
+            WHERE user_id = ?1 AND quality = ?2 AND filename = ?3
         ",
     )?;
 
-    let mut file_groups = stmt.query_map([&user.id.to_string(), &id], |row| {
-        Ok(FileGroup {
-            small: row.get(0)?,
-            medium: row.get(1)?,
-            original: row.get(2)?,
-        })
+    let mut files = stmt.query_map([&user.id.to_string(), &params.quality, &id], |row| {
+        Ok(row.get(0)?)
     })?;
 
     let config: S3Data = match user.config {
@@ -130,20 +135,11 @@ pub async fn get_image(
 
     let bucket = get_bucket(config)?;
 
-    let group = file_groups.next();
+    let file = files.next();
 
-    if let Some(group) = group {
-        let group = group?;
-        let mut name = "";
-        if group.small == id {
-            name = &group.small;
-        }
-        if group.medium == id {
-            name = &group.medium;
-        }
-        if group.original == id {
-            name = &group.original;
-        }
+    if let Some(file) = file {
+        let file: String = file?;
+        let name = format_filename(&file, &params.quality);
         let url = bucket.presign_get(format!("/{}", name), UPLOAD_LINK_TIMEOUT_SEC, None)?;
         return Ok(Redirect::temporary(&url));
     }

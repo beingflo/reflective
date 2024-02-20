@@ -22,9 +22,8 @@ pub fn apply_migrations(connection: &mut Connection) {
         M::up(
             "CREATE TABLE images (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                filename_small TEXT NOT NULL,
-                filename_medium TEXT NOT NULL,
-                filename_original TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                quality TEXT NOT NULL,
                 metadata TEXT,
                 user_id INTEGER NOT NULL,
                 FOREIGN KEY (user_id)
