@@ -23,7 +23,6 @@ pub fn apply_migrations(connection: &mut Connection) {
             "CREATE TABLE images (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, 
                 filename TEXT NOT NULL,
-                quality TEXT NOT NULL,
                 metadata TEXT,
                 user_id INTEGER NOT NULL,
                 FOREIGN KEY (user_id)

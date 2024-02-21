@@ -66,16 +66,8 @@ pub async fn upload_images(
         });
 
         connection.execute(
-            "INSERT INTO images (filename, quality, user_id) VALUES (?1, ?2, ?3)",
-            (&filename, "small", &user.id),
-        )?;
-        connection.execute(
-            "INSERT INTO images (filename, quality, user_id) VALUES (?1, ?2, ?3)",
-            (&filename, "medium", &user.id),
-        )?;
-        connection.execute(
-            "INSERT INTO images (filename, quality, user_id) VALUES (?1, ?2, ?3)",
-            (&filename, "original", &user.id),
+            "INSERT INTO images (filename, user_id) VALUES (?1, ?2)",
+            (&filename, &user.id),
         )?;
     }
 
@@ -92,7 +84,7 @@ pub async fn get_images(
         "
             SELECT filename 
             FROM images
-            WHERE user_id = ?1 AND quality = 'small'
+            WHERE user_id = ?1
         ",
     )?;
 
@@ -120,13 +112,11 @@ pub async fn get_image(
         "
             SELECT filename
             FROM images
-            WHERE user_id = ?1 AND quality = ?2 AND filename = ?3
+            WHERE user_id = ?1 AND filename = ?2
         ",
     )?;
 
-    let mut files = stmt.query_map([&user.id.to_string(), &params.quality, &id], |row| {
-        Ok(row.get(0)?)
-    })?;
+    let mut files = stmt.query_map([&user.id.to_string(), &id], |row| Ok(row.get(0)?))?;
 
     let config: S3Data = match user.config {
         Some(c) => c,
@@ -135,11 +125,10 @@ pub async fn get_image(
 
     let bucket = get_bucket(config)?;
 
-    let file = files.next();
+    let file: Option<Result<String, _>> = files.next();
 
-    if let Some(file) = file {
-        let file: String = file?;
-        let name = format_filename(&file, &params.quality);
+    if let Some(_) = file {
+        let name = format_filename(&id, &params.quality);
         let url = bucket.presign_get(format!("/{}", name), UPLOAD_LINK_TIMEOUT_SEC, None)?;
         return Ok(Redirect::temporary(&url));
     }
