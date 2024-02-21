@@ -53,11 +53,9 @@ pub async fn upload_images(
         let medium = format_filename(&filename, "medium");
         let original = format_filename(&filename, "original");
 
-        let url_small = bucket.presign_put(format!("/{}", small), UPLOAD_LINK_TIMEOUT_SEC, None)?;
-        let url_medium =
-            bucket.presign_put(format!("/{}", medium), UPLOAD_LINK_TIMEOUT_SEC, None)?;
-        let url_original =
-            bucket.presign_put(format!("/{}", original), UPLOAD_LINK_TIMEOUT_SEC, None)?;
+        let url_small = bucket.presign_put(&small, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+        let url_medium = bucket.presign_put(&medium, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+        let url_original = bucket.presign_put(&original, UPLOAD_LINK_TIMEOUT_SEC, None)?;
 
         files.push(FileGroup {
             small: url_small,
