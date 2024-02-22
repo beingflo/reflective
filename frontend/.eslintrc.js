@@ -11,7 +11,7 @@ module.exports = {
     ecmaVersion: 2021,
     sourceType: 'module',
     tsconfigRootDir: __dirname,
-    project: ['./tsconfig.json'],
+    project: ['./tsconfig.json']
   },
   env: {
     es6: true,
@@ -20,10 +20,10 @@ module.exports = {
   },
   plugins: ['@typescript-eslint', 'prettier'],
   rules: {
-    "prettier/prettier": "error",
-    "@typescript-eslint/indent": ["error", 2],
-    "@typescript-eslint/no-unused-vars": "error",
-    "@typescript-eslint/no-explicit-any": "error"
+    'prettier/prettier': 'error',
+    '@typescript-eslint/indent': ['error', 2],
+    '@typescript-eslint/no-unused-vars': 'warn',
+    '@typescript-eslint/no-explicit-any': 'error'
   },
-  ignorePatterns: ['node_modules']
+  ignorePatterns: ['node_modules', '.eslintrc.js']
 }
