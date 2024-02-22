@@ -2,6 +2,6 @@ module.exports = {
   plugins: {
     tailwindcss: {},
     autoprefixer: {},
-    cssnano: { preset: 'advanced' }
-  }
-}
+    cssnano: { preset: 'advanced' },
+  },
+};
