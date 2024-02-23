@@ -1,9 +1,11 @@
+import { useNavigate } from '@solidjs/router';
 import { createSignal, type Component } from 'solid-js';
 
 const Login: Component = () => {
   const [username, setUsername] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [, setError] = createSignal('');
+  const navigate = useNavigate();
 
   const submit = (event: Event): void => {
     event.preventDefault();
@@ -14,7 +16,13 @@ const Login: Component = () => {
         'content-type': 'application/json',
       },
     })
-      .then((response) => !response.ok && setError(response.statusText))
+      .then((response) => {
+        if (response.ok) {
+          navigate('/');
+        } else {
+          setError(response.statusText);
+        }
+      })
       .catch((error: Error) => setError(error.message));
   };
 
@@ -36,6 +44,7 @@ const Login: Component = () => {
           <span class="text-sm text-gray-700">Username</span>
           <input
             type="text"
+            autofocus
             class="focus:outline-none mt-0 block w-full border-0 border-b-2 border-dotted border-gray-400 px-0.5 focus:border-black focus:ring-0"
             placeholder=""
             value={username()}
