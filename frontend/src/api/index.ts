@@ -1,4 +1,4 @@
-import { UpdateConfigRequest } from './types';
+import { UpdateConfigRequest } from '../types';
 
 export const login = async (username: string, password: string) => {
   const response = await fetch('/auth/login', {
