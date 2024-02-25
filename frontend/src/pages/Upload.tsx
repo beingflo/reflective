@@ -1,21 +1,33 @@
-import { createSignal, type Component, onMount } from 'solid-js';
+import { createSignal, type Component, onMount, createEffect } from 'solid-js';
 
 const Upload: Component = () => {
-  const [content, setContent] = createSignal('');
+  const [files, setFiles] = createSignal();
+  const [uploadLinks, setUploadLinks] = createSignal([]);
   let ref: HTMLInputElement;
+
+  createEffect(() => console.log(uploadLinks()));
 
   onMount(() => {
     ref.addEventListener('change', () => {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        console.log(evt.target.result);
-      };
-      const numFiles = ref.files.length;
-      [...Array(numFiles).keys()].forEach((i: number) => {
-        reader.readAsText(ref.files.item(i));
-      });
+      setFiles(ref.files);
+
+      fetch((uploadLinks() as Array<{ original: string }>)[0].original, {
+        body: ref.files[0],
+        method: 'PUT',
+      }).catch(() => null);
     });
   });
+
+  fetch('/api/images/upload', {
+    body: JSON.stringify({ number: 1 }),
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+  })
+    .then((response) => response.json())
+    .then((body) => setUploadLinks(body))
+    .catch(() => null);
 
   return (
     <div class="mx-auto flex flex-col w-1/2 min-w-96 pt-12">

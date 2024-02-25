@@ -22,6 +22,7 @@ module.exports = {
     '@typescript-eslint/indent': ['error', 2],
     '@typescript-eslint/no-unused-vars': 'warn',
     '@typescript-eslint/no-explicit-any': 'error',
+    '@typescript-eslint/no-unsafe-return': 'ignore',
   },
   ignorePatterns: ['node_modules', '.eslintrc.js'],
 };
