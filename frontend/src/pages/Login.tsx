@@ -9,7 +9,7 @@ const Login: Component = () => {
 
   const submit = (event: Event): void => {
     event.preventDefault();
-    fetch('/auth/login', {
+    fetch('/api/auth/login', {
       body: JSON.stringify({ username: username(), password: password() }),
       method: 'POST',
       headers: {

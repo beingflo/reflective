@@ -10,7 +10,7 @@ const Config: Component = () => {
 
   const submit = (event: Event): void => {
     event.preventDefault();
-    fetch('/user/config', {
+    fetch('/api/user/config', {
       body: JSON.stringify({
         bucket: bucket(),
         endpoint: endpoint(),

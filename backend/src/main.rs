@@ -33,12 +33,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     apply_migrations(&mut conn);
 
     let app = Router::new()
-        .route("/auth/signup", post(signup))
-        .route("/auth/login", post(login))
-        .route("/user/config", patch(update_config))
-        .route("/images/upload", post(upload_images))
-        .route("/images", get(get_images))
-        .route("/images/:id", get(get_image))
+        .route("/api/auth/signup", post(signup))
+        .route("/api/auth/login", post(login))
+        .route("/api/user/config", patch(update_config))
+        .route("/api/images/upload", post(upload_images))
+        .route("/api/images", get(get_images))
+        .route("/api/images/:id", get(get_image))
         .with_state(AppState {
             conn: Arc::new(Mutex::new(conn)),
         });
