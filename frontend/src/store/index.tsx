@@ -3,15 +3,17 @@ import { createStore } from 'solid-js/store';
 
 export const storeName = 'store';
 
-const StoreContext = createContext({});
+const StoreContext = createContext<any[]>();
 
 const localState = localStorage.getItem(storeName);
 
 export type State = {
-  images: Array<string>;
+  images: Array<File>;
 };
 
-const parsedState: State = localState ? (JSON.parse(localState) as State) : { images: [] };
+const parsedState: State = localState
+  ? (JSON.parse(localState) as State)
+  : { images: [] };
 
 export const [state, setState] = createStore(parsedState);
 
@@ -25,13 +27,17 @@ export function StoreProvider(props: StoreProviderProps) {
   const store = [
     state,
     {
-      setImages(images: Array<string>) {
+      setImages(images: Array<File>) {
         setState({ images });
       },
     },
   ];
 
-  return <StoreContext.Provider value={store}>{props.children}</StoreContext.Provider>;
+  return (
+    <StoreContext.Provider value={store}>
+      {props.children}
+    </StoreContext.Provider>
+  );
 }
 
 export const useStore = () => useContext(StoreContext);

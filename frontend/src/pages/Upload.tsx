@@ -1,6 +1,8 @@
 import { createSignal, type Component, onMount, createEffect } from 'solid-js';
+import { useStore } from '../store';
 
 const Upload: Component = () => {
+  const [state, { setImages }] = useStore();
   const [files, setFiles] = createSignal();
   const [uploadLinks, setUploadLinks] = createSignal([]);
   let ref: HTMLInputElement;
@@ -9,7 +11,7 @@ const Upload: Component = () => {
 
   onMount(() => {
     ref.addEventListener('change', () => {
-      setFiles(ref.files);
+      setImages(ref.files);
 
       fetch((uploadLinks() as Array<{ original: string }>)[0].original, {
         body: ref.files[0],
