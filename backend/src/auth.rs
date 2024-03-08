@@ -84,22 +84,26 @@ pub async fn signup(
     State(state): State<AppState>,
     Json(user): Json<User>,
 ) -> Result<StatusCode, AppError> {
-    let connection = state.conn.lock().await;
+    {
+        let connection = state.conn.lock().await;
 
-    let mut stmt =
-        connection.prepare("SELECT username, password FROM users WHERE username = ?1")?;
+        let mut stmt =
+            connection.prepare("SELECT username, password FROM users WHERE username = ?1")?;
 
-    let mut rows = stmt.query([&user.username])?;
+        let mut rows = stmt.query([&user.username])?;
 
-    // User already exists
-    if let Some(_) = rows.next()? {
-        return Err(AppError::Status(StatusCode::CONFLICT));
+        // User already exists
+        if let Some(_) = rows.next()? {
+            return Err(AppError::Status(StatusCode::CONFLICT));
+        }
     }
 
     let password = match hash(user.password, BCRYPT_COST) {
         Ok(pw) => pw,
         Err(_) => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
     };
+
+    let connection = state.conn.lock().await;
 
     connection.execute(
         "INSERT INTO users (username, password) VALUES (?1, ?2)",
@@ -114,17 +118,21 @@ pub async fn login(
     State(state): State<AppState>,
     Json(user): Json<User>,
 ) -> Result<(CookieJar, StatusCode), AppError> {
-    let connection = state.conn.lock().await;
+    let db_user = {
+        let connection = state.conn.lock().await;
 
-    let mut stmt = connection.prepare("SELECT id, password FROM users WHERE username = ?1")?;
-    let mut rows = stmt.query([user.username])?;
+        let mut stmt = connection.prepare("SELECT id, password FROM users WHERE username = ?1")?;
+        let mut rows = stmt.query([user.username])?;
 
-    let db_user = match rows.next()? {
-        Some(row) => DBUser {
-            id: row.get(0)?,
-            password: row.get(1)?,
-        },
-        None => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
+        let db_user = match rows.next()? {
+            Some(row) => DBUser {
+                id: row.get(0)?,
+                password: row.get(1)?,
+            },
+            None => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
+        };
+
+        db_user
     };
 
     match verify(user.password, &db_user.password) {
@@ -134,6 +142,8 @@ pub async fn login(
     }
 
     let auth_token = get_auth_token();
+
+    let connection = state.conn.lock().await;
 
     connection.execute(
         "INSERT INTO tokens (token, user_id) VALUES (?1, ?2)",
