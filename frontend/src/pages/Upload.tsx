@@ -1,35 +1,37 @@
-import { createSignal, type Component, onMount, createEffect } from 'solid-js';
+import { type Component, onMount, createEffect, createSignal } from 'solid-js';
 import { useStore } from '../store';
 
 const Upload: Component = () => {
-  const [state, { setImages }] = useStore();
-  const [files, setFiles] = createSignal();
-  const [uploadLinks, setUploadLinks] = createSignal([]);
+  const [state] = useStore();
+  const [images, setImages] = createSignal([]);
   let ref: HTMLInputElement;
-
-  createEffect(() => console.log(uploadLinks()));
 
   onMount(() => {
     ref.addEventListener('change', () => {
-      setImages(ref.files);
-
-      fetch((uploadLinks() as Array<{ original: string }>)[0].original, {
-        body: ref.files[0],
-        method: 'PUT',
-      }).catch(() => null);
+      setImages(Array.from(ref.files));
     });
   });
 
-  fetch('/api/images/upload', {
-    body: JSON.stringify({ number: 1 }),
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-  })
-    .then((response) => response.json())
-    .then((body) => setUploadLinks(body))
-    .catch(() => null);
+  const uploadImage = async (image: File) => {
+    const response = await fetch('/api/images/upload', {
+      body: JSON.stringify({ number: 1 }),
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+    }).then((response) => response.json());
+
+    const uploadLink = response[0].original;
+
+    await fetch(uploadLink, {
+      body: image,
+      method: 'PUT',
+    });
+  };
+
+  createEffect(() => {
+    images()?.forEach((image) => uploadImage(image));
+  });
 
   return (
     <div class="mx-auto flex flex-col w-1/2 min-w-96 pt-12">
