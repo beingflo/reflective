@@ -1,7 +1,29 @@
-import type { Component } from 'solid-js';
+import { createSignal, type Component, createEffect, For } from 'solid-js';
 
 const View: Component = () => {
-  return <p class="text-4xl text-black text-center py-20">View</p>;
+  const [images, setImages] = createSignal([]);
+
+  createEffect(async () => {
+    const response = await fetch('/api/images', {
+      headers: {
+        'content-type': 'application/json',
+      },
+    }).then((response) => response.json());
+
+    setImages(response);
+  });
+
+  return (
+    <div class="flex flex-col w-1/2 mx-auto gap-12">
+      <For each={images()}>
+        {(image) => (
+          <div>
+            <img src={`/api/images/${image}?quality=original`} />
+          </div>
+        )}
+      </For>
+    </div>
+  );
 };
 
 export default View;
