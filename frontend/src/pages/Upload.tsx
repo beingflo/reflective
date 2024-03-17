@@ -13,20 +13,13 @@ const Upload: Component = () => {
   });
 
   const uploadImage = async (image: File) => {
+    const formData = new FormData();
+    formData.append('image', image, 'test');
+
     const response = await fetch('/api/images/upload', {
-      body: JSON.stringify({ number: 1 }),
+      body: formData,
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
     }).then((response) => response.json());
-
-    const uploadLink = response[0].original;
-
-    await fetch(uploadLink, {
-      body: image,
-      method: 'PUT',
-    });
   };
 
   createEffect(() => {

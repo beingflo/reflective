@@ -9,11 +9,12 @@ use std::sync::Arc;
 
 use auth::{login, signup};
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{get, patch, post},
     Router,
 };
 use dotenv::dotenv;
-use image::{get_image, get_images, upload_images};
+use image::{get_image, get_images, upload_image};
 use migration::apply_migrations;
 use rusqlite::Connection;
 use tokio::sync::Mutex;
@@ -36,12 +37,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/auth/signup", post(signup))
         .route("/api/auth/login", post(login))
         .route("/api/user/config", patch(update_config))
-        .route("/api/images/upload", post(upload_images))
+        .route("/api/images/upload", post(upload_image))
         .route("/api/images", get(get_images))
         .route("/api/images/:id", get(get_image))
         .with_state(AppState {
             conn: Arc::new(Mutex::new(conn)),
-        });
+        })
+        .layer(DefaultBodyLimit::disable());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await?;
     axum::serve(listener, app).await?;

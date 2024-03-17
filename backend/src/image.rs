@@ -5,39 +5,24 @@ use crate::{
     utils::{format_filename, get_bucket, get_file_name},
 };
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Multipart, Path, Query, State},
     http::StatusCode,
     response::Redirect,
     Json,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::AppState;
 
-const MAX_FILES_PER_REQUEST: u32 = 32;
 const UPLOAD_LINK_TIMEOUT_SEC: u32 = 600;
 
-#[derive(Serialize, Deserialize)]
-pub struct UploadRequest {
-    number: u32,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct FileGroup {
-    small: String,
-    medium: String,
-    original: String,
-}
-
-pub async fn upload_images(
+pub async fn upload_image(
     user: AuthenticatedUser,
     State(state): State<AppState>,
-    Json(data): Json<UploadRequest>,
-) -> Result<(StatusCode, Json<Vec<FileGroup>>), AppError> {
-    if data.number > MAX_FILES_PER_REQUEST {
-        return Err(AppError::Status(StatusCode::BAD_REQUEST));
-    }
-    let connection = state.conn.lock().await;
+    mut multipart: Multipart,
+) -> Result<StatusCode, AppError> {
+    println!("upload image");
+    //let connection = state.conn.lock().await;
 
     let config: S3Data = match user.config {
         Some(c) => c,
@@ -46,30 +31,25 @@ pub async fn upload_images(
 
     let bucket = get_bucket(config)?;
 
-    let mut files = Vec::new();
-    for _ in 0..data.number {
-        let filename = get_file_name();
-        let small = format_filename(&filename, "small");
-        let medium = format_filename(&filename, "medium");
-        let original = format_filename(&filename, "original");
+    let filename = get_file_name();
+    let original = format_filename(&filename, "original");
 
-        let url_small = bucket.presign_put(&small, UPLOAD_LINK_TIMEOUT_SEC, None)?;
-        let url_medium = bucket.presign_put(&medium, UPLOAD_LINK_TIMEOUT_SEC, None)?;
-        let url_original = bucket.presign_put(&original, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+    let url_original = bucket.presign_put(&original, UPLOAD_LINK_TIMEOUT_SEC, None)?;
 
-        files.push(FileGroup {
-            small: url_small,
-            medium: url_medium,
-            original: url_original,
-        });
+    // connection.execute(
+    //     "INSERT INTO images (filename, user_id) VALUES (?1, ?2)",
+    //     (&filename, &user.id),
+    // )?;
 
-        connection.execute(
-            "INSERT INTO images (filename, user_id) VALUES (?1, ?2)",
-            (&filename, &user.id),
-        )?;
+    while let Some(mut field) = multipart.next_field().await.unwrap() {
+        let name = field.name().unwrap().to_string();
+        let data = field.bytes().await.unwrap();
+
+        println!("Length of `{}` is {} bytes", name, data.len());
+        // TODO upload file here with request
     }
 
-    Ok((StatusCode::OK, Json(files)))
+    Ok(StatusCode::OK)
 }
 
 pub async fn get_images(
