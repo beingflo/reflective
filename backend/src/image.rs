@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 use crate::{
     auth::AuthenticatedUser,
     error::AppError,
@@ -10,6 +12,7 @@ use axum::{
     response::Redirect,
     Json,
 };
+use image::{codecs::jpeg::JpegEncoder, io::Reader};
 use serde::Deserialize;
 
 use crate::AppState;
@@ -45,7 +48,19 @@ pub async fn upload_image(
         let name = field.name().unwrap().to_string();
         let data = field.bytes().await.unwrap();
 
+        let image = Reader::new(Cursor::new(&data))
+            .with_guessed_format()
+            .unwrap();
+
+        let image = image.decode().unwrap();
+        let downsampled = image.resize(300, 200, image::imageops::FilterType::Triangle);
+        let mut bytes: Vec<u8> = Vec::new();
+        let write = Cursor::new(&mut bytes);
+        let encoder = JpegEncoder::new_with_quality(write, 255);
+        downsampled.write_with_encoder(encoder).unwrap();
+
         println!("Length of `{}` is {} bytes", name, data.len());
+        println!("Length of `{}` is {} bytes", name, bytes.len());
         // TODO upload file here with request
     }
 
