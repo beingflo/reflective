@@ -53,10 +53,10 @@ pub async fn upload_image(
             .unwrap();
 
         let image = image.decode().unwrap();
-        let downsampled = image.resize(300, 200, image::imageops::FilterType::Triangle);
+        let downsampled = image.resize(2000, 2000, image::imageops::FilterType::Triangle);
         let mut bytes: Vec<u8> = Vec::new();
         let write = Cursor::new(&mut bytes);
-        let encoder = JpegEncoder::new_with_quality(write, 255);
+        let encoder = JpegEncoder::new_with_quality(write, 70);
         downsampled.write_with_encoder(encoder).unwrap();
 
         println!("Length of `{}` is {} bytes", name, data.len());
