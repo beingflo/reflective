@@ -15,11 +15,15 @@ use axum::{
 use image::io::Reader;
 use reqwest::Client;
 use serde::Deserialize;
+use tracing::info;
 
 use crate::AppState;
 
 const UPLOAD_LINK_TIMEOUT_SEC: u32 = 600;
 
+#[tracing::instrument(skip_all, fields(
+    username = %user.username,
+))]
 pub async fn upload_image(
     user: AuthenticatedUser,
     State(state): State<AppState>,
@@ -37,6 +41,8 @@ pub async fn upload_image(
         let original_name = format_filename(&filename, "original");
         let medium_name = format_filename(&filename, "medium");
         let small_name = format_filename(&filename, "small");
+
+        info!(filename);
 
         {
             let connection = state.conn.lock().await;
@@ -60,6 +66,12 @@ pub async fn upload_image(
         let original_url = bucket.presign_put(&original_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
         let medium_url = bucket.presign_put(&medium_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
         let small_url = bucket.presign_put(&small_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+
+        info!(
+            filesize_original = image_data.len(),
+            filesize_medium = medium_image.len(),
+            filesize_small = small_image.len(),
+        );
 
         let client = Client::new();
         client
@@ -106,11 +118,16 @@ pub async fn get_images(
     Ok((StatusCode::OK, Json(files)))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct QueryParams {
     quality: String,
 }
 
+#[tracing::instrument(skip_all, fields(
+    username = %user.username,
+    id = %id,
+    quality = %params.quality
+))]
 pub async fn get_image(
     user: AuthenticatedUser,
     Path(id): Path<String>,

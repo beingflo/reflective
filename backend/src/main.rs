@@ -18,9 +18,10 @@ use image::{get_image, get_images, upload_image};
 use migration::apply_migrations;
 use rusqlite::Connection;
 use tokio::sync::Mutex;
+use tracing_subscriber::fmt::format::FmtSpan;
 use user::update_config;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AppState {
     conn: Arc<Mutex<Connection>>,
 }
@@ -28,6 +29,11 @@ pub struct AppState {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
+
+    let subscriber = tracing_subscriber::fmt()
+        .with_span_events(FmtSpan::CLOSE)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber)?;
 
     let mut conn = Connection::open("./db.sqlite")?;
 

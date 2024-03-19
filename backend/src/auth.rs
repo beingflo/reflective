@@ -24,6 +24,7 @@ pub struct DBUser {
     password: String,
 }
 
+#[derive(Debug)]
 pub struct AuthenticatedUser {
     pub id: u64,
     pub username: String,

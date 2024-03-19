@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::AppState;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct S3Data {
     pub bucket: String,
     pub endpoint: String,

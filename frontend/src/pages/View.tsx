@@ -18,7 +18,7 @@ const View: Component = () => {
       <For each={images()}>
         {(image) => (
           <div class="min-h-96">
-            <img loading="lazy" src={`/api/images/${image}?quality=original`} />
+            <img loading="lazy" src={`/api/images/${image}?quality=small`} />
           </div>
         )}
       </For>
