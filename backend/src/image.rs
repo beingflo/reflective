@@ -4,7 +4,7 @@ use crate::{
     auth::AuthenticatedUser,
     error::AppError,
     user::S3Data,
-    utils::{format_filename, get_bucket, get_file_name},
+    utils::{compress_image, format_filename, get_bucket, get_file_name},
 };
 use axum::{
     extract::{Multipart, Path, Query, State},
@@ -12,7 +12,8 @@ use axum::{
     response::Redirect,
     Json,
 };
-use image::{codecs::jpeg::JpegEncoder, io::Reader};
+use image::io::Reader;
+use reqwest::Client;
 use serde::Deserialize;
 
 use crate::AppState;
@@ -24,9 +25,6 @@ pub async fn upload_image(
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<StatusCode, AppError> {
-    println!("upload image");
-    //let connection = state.conn.lock().await;
-
     let config: S3Data = match user.config {
         Some(c) => c,
         None => return Err(AppError::Status(StatusCode::BAD_REQUEST)),
@@ -34,34 +32,54 @@ pub async fn upload_image(
 
     let bucket = get_bucket(config)?;
 
-    let filename = get_file_name();
-    let original = format_filename(&filename, "original");
+    if let Some(field) = multipart.next_field().await.unwrap() {
+        let filename = get_file_name();
+        let original_name = format_filename(&filename, "original");
+        let medium_name = format_filename(&filename, "medium");
+        let small_name = format_filename(&filename, "small");
 
-    let url_original = bucket.presign_put(&original, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+        {
+            let connection = state.conn.lock().await;
 
-    // connection.execute(
-    //     "INSERT INTO images (filename, user_id) VALUES (?1, ?2)",
-    //     (&filename, &user.id),
-    // )?;
+            connection.execute(
+                "INSERT INTO images (filename, user_id) VALUES (?1, ?2)",
+                (&filename, &user.id),
+            )?;
+        }
 
-    while let Some(mut field) = multipart.next_field().await.unwrap() {
-        let name = field.name().unwrap().to_string();
-        let data = field.bytes().await.unwrap();
+        let image_data = field.bytes().await.unwrap();
 
-        let image = Reader::new(Cursor::new(&data))
+        let image = Reader::new(Cursor::new(&image_data))
             .with_guessed_format()
             .unwrap();
 
-        let image = image.decode().unwrap();
-        let downsampled = image.resize(2000, 2000, image::imageops::FilterType::Triangle);
-        let mut bytes: Vec<u8> = Vec::new();
-        let write = Cursor::new(&mut bytes);
-        let encoder = JpegEncoder::new_with_quality(write, 70);
-        downsampled.write_with_encoder(encoder).unwrap();
+        let original_image = image.decode().unwrap();
+        let medium_image = compress_image(&original_image, 2000, 70);
+        let small_image = compress_image(&original_image, 1000, 60);
 
-        println!("Length of `{}` is {} bytes", name, data.len());
-        println!("Length of `{}` is {} bytes", name, bytes.len());
-        // TODO upload file here with request
+        let original_url = bucket.presign_put(&original_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+        let medium_url = bucket.presign_put(&medium_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+        let small_url = bucket.presign_put(&small_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+
+        let client = Client::new();
+        client
+            .put(original_url)
+            .body(image_data)
+            .send()
+            .await
+            .unwrap();
+        client
+            .put(medium_url)
+            .body(medium_image)
+            .send()
+            .await
+            .unwrap();
+        client
+            .put(small_url)
+            .body(small_image)
+            .send()
+            .await
+            .unwrap();
     }
 
     Ok(StatusCode::OK)

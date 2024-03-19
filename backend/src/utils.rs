@@ -1,3 +1,7 @@
+use std::io::Cursor;
+
+use image::codecs::jpeg::JpegEncoder;
+use image::DynamicImage;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use s3::creds::Credentials;
@@ -48,4 +52,17 @@ pub fn get_bucket(config: S3Data) -> Result<Bucket, AppError> {
 
 pub fn format_filename(filename: &str, quality: &str) -> String {
     format!("{}-{}", filename, quality)
+}
+
+pub fn compress_image(original: &DynamicImage, size: u32, quality: u8) -> Vec<u8> {
+    let image = original.resize(size, size, image::imageops::FilterType::Triangle);
+
+    let mut bytes: Vec<u8> = Vec::new();
+
+    let write = Cursor::new(&mut bytes);
+
+    let encoder = JpegEncoder::new_with_quality(write, quality);
+    image.write_with_encoder(encoder).unwrap();
+
+    bytes
 }
