@@ -33,7 +33,10 @@ pub async fn upload_image(
 ) -> Result<StatusCode, AppError> {
     let config: S3Data = match user.config {
         Some(c) => c,
-        None => return Err(AppError::Status(StatusCode::BAD_REQUEST)),
+        None => {
+            warn!(message = "user config doesn't exist");
+            return Err(AppError::Status(StatusCode::BAD_REQUEST));
+        }
     };
 
     let bucket = get_bucket(config)?;
@@ -118,7 +121,9 @@ pub async fn get_images(
 
     let files = stmt.query_map([user.id], |row| Ok(row.get(0)?))?;
 
-    let files = files.collect::<Result<_, _>>()?;
+    let files = files.collect::<Result<Vec<_>, _>>()?;
+
+    info!(message = "load image list", number_of_files = files.len());
 
     Ok((StatusCode::OK, Json(files)))
 }
@@ -140,6 +145,8 @@ pub async fn get_image(
     State(state): State<AppState>,
 ) -> Result<Redirect, AppError> {
     let connection = state.conn.lock().await;
+
+    info!(message = "get image");
 
     check_image_exists(connection, &user.id.to_string(), &id).await?;
 

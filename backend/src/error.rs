@@ -4,6 +4,7 @@ use axum::{
 };
 use rusqlite::Error;
 use thiserror::Error;
+use tracing::error;
 
 #[derive(Error, Debug)]
 pub enum AppError {
@@ -21,6 +22,8 @@ pub enum AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        error!(message = "app error", error = %self);
+
         match self {
             AppError::Status(code) => code.into_response(),
             AppError::DBError(error) => {
