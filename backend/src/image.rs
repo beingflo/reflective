@@ -14,8 +14,10 @@ use axum::{
 };
 use image::io::Reader;
 use reqwest::Client;
+use rusqlite::Connection;
 use serde::Deserialize;
-use tracing::info;
+use tokio::sync::MutexGuard;
+use tracing::{info, warn};
 
 use crate::AppState;
 
@@ -97,6 +99,9 @@ pub async fn upload_image(
     Ok(StatusCode::OK)
 }
 
+#[tracing::instrument(skip_all, fields(
+    username = %user.username,
+))]
 pub async fn get_images(
     user: AuthenticatedUser,
     State(state): State<AppState>,
@@ -136,6 +141,33 @@ pub async fn get_image(
 ) -> Result<Redirect, AppError> {
     let connection = state.conn.lock().await;
 
+    check_image_exists(connection, &user.id.to_string(), &id).await?;
+
+    let config: S3Data = match user.config {
+        Some(c) => c,
+        None => {
+            warn!(message = "user config doesn't exist");
+            return Err(AppError::Status(StatusCode::NOT_FOUND));
+        }
+    };
+
+    let bucket = get_bucket(config)?;
+
+    let name = format_filename(&id, &params.quality);
+    let url = bucket.presign_get(format!("/{}", name), UPLOAD_LINK_TIMEOUT_SEC, None)?;
+
+    return Ok(Redirect::temporary(&url));
+}
+
+#[tracing::instrument(skip_all, fields(
+    user_id = %user_id,
+    image_id = %image_id,
+))]
+async fn check_image_exists(
+    connection: MutexGuard<'_, Connection>,
+    user_id: &str,
+    image_id: &str,
+) -> Result<(), AppError> {
     let mut stmt = connection.prepare(
         "
             SELECT filename
@@ -144,22 +176,17 @@ pub async fn get_image(
         ",
     )?;
 
-    let mut files = stmt.query_map([&user.id.to_string(), &id], |row| Ok(row.get(0)?))?;
-
-    let config: S3Data = match user.config {
-        Some(c) => c,
-        None => return Err(AppError::Status(StatusCode::NOT_FOUND)),
-    };
-
-    let bucket = get_bucket(config)?;
+    let mut files = stmt.query_map([user_id.to_string(), image_id.to_string()], |row| {
+        Ok(row.get(0)?)
+    })?;
 
     let file: Option<Result<String, _>> = files.next();
 
     if let Some(_) = file {
-        let name = format_filename(&id, &params.quality);
-        let url = bucket.presign_get(format!("/{}", name), UPLOAD_LINK_TIMEOUT_SEC, None)?;
-        return Ok(Redirect::temporary(&url));
+        return Ok(());
     }
+
+    warn!(message = "image doesn't exist");
 
     return Err(AppError::Status(StatusCode::NOT_FOUND));
 }
