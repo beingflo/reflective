@@ -8,6 +8,7 @@ use axum::{
 use axum_extra::extract::{cookie::Cookie, CookieJar};
 use bcrypt::{hash, verify};
 use serde::{Deserialize, Serialize};
+use tracing::{error, warn};
 
 use crate::AppState;
 
@@ -35,6 +36,7 @@ pub struct AuthenticatedUser {
 impl FromRequestParts<AppState> for AuthenticatedUser {
     type Rejection = AppError;
 
+    #[tracing::instrument(skip_all)]
     async fn from_request_parts(
         parts: &mut Parts,
         state: &AppState,
@@ -48,7 +50,10 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
 
         let token = match cookies.get("token") {
             Some(token) => token,
-            None => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
+            None => {
+                error!(message = "Missing token cookie");
+                return Err(AppError::Status(StatusCode::UNAUTHORIZED));
+            }
         };
 
         let mut stmt = connection.prepare(
@@ -74,13 +79,17 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
                     },
                 }
             }
-            None => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
+            None => {
+                error!(message = "No user found for token");
+                return Err(AppError::Status(StatusCode::UNAUTHORIZED));
+            }
         };
 
         return Ok(user);
     }
 }
 
+#[tracing::instrument(skip_all, fields( user = %user.username ))]
 pub async fn signup(
     State(state): State<AppState>,
     Json(user): Json<User>,
@@ -95,6 +104,7 @@ pub async fn signup(
 
         // User already exists
         if let Some(_) = rows.next()? {
+            warn!(message = "User already exists");
             return Err(AppError::Status(StatusCode::CONFLICT));
         }
     }
@@ -114,6 +124,7 @@ pub async fn signup(
     Ok(StatusCode::OK)
 }
 
+#[tracing::instrument(skip_all, fields( user = %user.username ))]
 pub async fn login(
     jar: CookieJar,
     State(state): State<AppState>,
@@ -130,7 +141,10 @@ pub async fn login(
                 id: row.get(0)?,
                 password: row.get(1)?,
             },
-            None => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
+            None => {
+                error!(message = "User doesn't exist");
+                return Err(AppError::Status(StatusCode::UNAUTHORIZED));
+            }
         };
 
         db_user
@@ -138,7 +152,10 @@ pub async fn login(
 
     match verify(user.password, &db_user.password) {
         Err(_) => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
-        Ok(false) => return Err(AppError::Status(StatusCode::UNAUTHORIZED)),
+        Ok(false) => {
+            error!("Password doesn't match");
+            return Err(AppError::Status(StatusCode::UNAUTHORIZED));
+        }
         Ok(true) => (),
     }
 
