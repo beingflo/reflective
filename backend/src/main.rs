@@ -18,6 +18,7 @@ use image::{get_image, get_images, upload_image};
 use migration::apply_migrations;
 use rusqlite::Connection;
 use tokio::sync::Mutex;
+use tracing::info;
 use user::update_config;
 
 #[derive(Clone, Debug)]
@@ -49,6 +50,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(DefaultBodyLimit::disable());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await?;
+
+    info!(message = "Starting server");
     axum::serve(listener, app).await?;
 
     Ok(())

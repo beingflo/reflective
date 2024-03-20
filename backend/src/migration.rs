@@ -1,6 +1,8 @@
 use rusqlite::Connection;
 use rusqlite_migration::{Migrations, M};
+use tracing::{error, info};
 
+#[tracing::instrument(skip_all)]
 pub fn apply_migrations(connection: &mut Connection) {
     let migrations = Migrations::new(vec![
         M::up(
@@ -32,9 +34,11 @@ pub fn apply_migrations(connection: &mut Connection) {
     ]);
 
     match migrations.to_latest(connection) {
-        Ok(_) => {}
+        Ok(_) => {
+            info!(message = "Applied migrations successfully");
+        }
         Err(error) => {
-            println!("Error applying migrations: {}", error);
+            error!(message = "Error applying migrations", error = %error);
             panic!();
         }
     }

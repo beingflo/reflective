@@ -13,6 +13,7 @@ pub struct S3Data {
     pub secret_key: String,
 }
 
+#[tracing::instrument(skip_all, fields(user = %user.username))]
 pub async fn update_config(
     user: AuthenticatedUser,
     State(state): State<AppState>,
