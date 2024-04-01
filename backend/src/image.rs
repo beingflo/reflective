@@ -47,8 +47,6 @@ pub async fn upload_image(
         let medium_name = format_filename(&filename, "medium");
         let small_name = format_filename(&filename, "small");
 
-        info!(filename);
-
         {
             let connection = state.conn.lock().await;
 
@@ -73,6 +71,7 @@ pub async fn upload_image(
         let small_url = bucket.presign_put(&small_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
 
         info!(
+            filename,
             filesize_original = image_data.len(),
             filesize_medium = medium_image.len(),
             filesize_small = small_image.len(),

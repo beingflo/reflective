@@ -19,6 +19,7 @@ use migration::apply_migrations;
 use rusqlite::Connection;
 use tokio::sync::Mutex;
 use tracing::info;
+use tracing_subscriber::fmt::format::FmtSpan;
 use user::update_config;
 
 #[derive(Clone, Debug)]
@@ -30,7 +31,7 @@ pub struct AppState {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
-    let subscriber = tracing_subscriber::fmt().finish();
+    let subscriber = tracing_subscriber::fmt().with_span_events(FmtSpan::CLOSE).finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
     let mut conn = Connection::open("./db.sqlite")?;
