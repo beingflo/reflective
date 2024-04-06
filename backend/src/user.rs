@@ -1,6 +1,7 @@
 use crate::{auth::AuthenticatedUser, error::AppError};
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::AppState;
 
@@ -25,5 +26,6 @@ pub async fn update_config(
 
     stmt.execute([serde_json::to_string(&data)?, user.id.to_string()])?;
 
+    info!("Updated config");
     Ok(StatusCode::OK)
 }

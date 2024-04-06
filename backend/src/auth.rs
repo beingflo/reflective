@@ -8,7 +8,7 @@ use axum::{
 use axum_extra::extract::{cookie::Cookie, CookieJar};
 use bcrypt::{hash, verify};
 use serde::{Deserialize, Serialize};
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 use crate::AppState;
 
@@ -121,6 +121,7 @@ pub async fn signup(
         (&user.username, password),
     )?;
 
+    info!(message = "User signed up");
     Ok(StatusCode::OK)
 }
 
@@ -173,5 +174,7 @@ pub async fn login(
             .path("/")
             .http_only(true),
     );
+
+    info!(message = "User logged in");
     Ok((jar, StatusCode::OK))
 }
