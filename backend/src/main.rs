@@ -31,7 +31,9 @@ pub struct AppState {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
 
-    let subscriber = tracing_subscriber::fmt().with_span_events(FmtSpan::CLOSE).finish();
+    let subscriber = tracing_subscriber::fmt()
+        .with_span_events(FmtSpan::CLOSE)
+        .finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
     let mut conn = Connection::open("./db.sqlite")?;
@@ -50,9 +52,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .layer(DefaultBodyLimit::disable());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await?;
+    let port = 3001;
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
 
-    info!(message = "Starting server");
+    info!(message = "Starting server", port);
     axum::serve(listener, app).await?;
 
     Ok(())
