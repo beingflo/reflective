@@ -12,7 +12,7 @@ use axum::{
     response::Redirect,
     Json,
 };
-use image::io::Reader;
+use image::ImageReader;
 use reqwest::Client;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -58,7 +58,7 @@ pub async fn upload_image(
 
         let image_data = field.bytes().await.unwrap();
 
-        let image = Reader::new(Cursor::new(&image_data))
+        let image = ImageReader::new(Cursor::new(&image_data))
             .with_guessed_format()
             .unwrap();
 
