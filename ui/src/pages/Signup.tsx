@@ -5,7 +5,7 @@ const Signup: Component = () => {
   const [username, setUsername] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [error, setError] = createSignal('');
-  const navigate = useNavigate();
+  const [success, setSuccess] = createSignal(false);
 
   const submit = (event: Event): void => {
     event.preventDefault();
@@ -18,9 +18,11 @@ const Signup: Component = () => {
     })
       .then((response) => {
         if (response.ok) {
-          navigate('/login');
+          setSuccess(true);
+          setError('');
         } else {
           setError(response.statusText);
+          setSuccess(false);
         }
       })
       .catch((error: Error) => setError(error.message));
@@ -61,7 +63,16 @@ const Signup: Component = () => {
           />
         </label>
         <Show when={error()}>
-          <div class="text-red-600">Error: {error()}</div>
+          <div class="text-rose-700">Error: {error()}</div>
+        </Show>
+        <Show when={success()}>
+          <div class="text-emerald-700">
+            Account creation successful. Please{' '}
+            <a href="/login" class="text-blue-600 underline">
+              login
+            </a>
+            .
+          </div>
         </Show>
         <button
           type="submit"
