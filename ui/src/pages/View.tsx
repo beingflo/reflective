@@ -17,7 +17,7 @@ const View: Component = () => {
     <div class="flex flex-col w-full px-4 md:px-0 md:w-1/3 mx-auto gap-8 md:gap-24 py-12">
       <For each={images()}>
         {(image) => (
-          <div class="min--96">
+          <div>
             <img loading="lazy" src={`/api/images/${image}?quality=medium`} />
           </div>
         )}
