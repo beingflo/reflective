@@ -6,9 +6,12 @@ const Signup: Component = () => {
   const [password, setPassword] = createSignal('');
   const [error, setError] = createSignal('');
   const [success, setSuccess] = createSignal(false);
+  const [loading, setLoading] = createSignal(false);
 
   const submit = (event: Event): void => {
     event.preventDefault();
+    setLoading(true);
+
     fetch('/api/auth/signup', {
       body: JSON.stringify({ username: username(), password: password() }),
       method: 'POST',
@@ -25,7 +28,12 @@ const Signup: Component = () => {
           setSuccess(false);
         }
       })
-      .catch((error: Error) => setError(error.message));
+      .catch((error: Error) => {
+        setError(error.message);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   return (
@@ -79,9 +87,16 @@ const Signup: Component = () => {
           class="mt-8 rounded-sm bg-white border border-black py-2
                     uppercase text-black hover:shadow-[6px_6px_0_#00000020] 
                     transition-all duration-75"
+          disabled={loading()}
         >
           <div class="relative">
-            <span>Signup</span>
+            <Show when={loading()} fallback={<span>Signup</span>}>
+              <span class="flex gap-x-1 justify-center">
+                <span class="animate-bounce">.</span>
+                <span class="animate-bounce delay-200">.</span>
+                <span class="animate-bounce delay-400">.</span>
+              </span>
+            </Show>
           </div>
         </button>
       </form>
