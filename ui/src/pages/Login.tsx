@@ -1,14 +1,16 @@
 import { useNavigate } from '@solidjs/router';
-import { createSignal, type Component } from 'solid-js';
+import { createSignal, type Component, Show } from 'solid-js';
 
 const Login: Component = () => {
   const [username, setUsername] = createSignal('');
   const [password, setPassword] = createSignal('');
-  const [, setError] = createSignal('');
+  const [error, setError] = createSignal('');
+  const [loading, setLoading] = createSignal(false);
   const navigate = useNavigate();
 
   const submit = (event: Event): void => {
     event.preventDefault();
+    setLoading(true);
     fetch('/api/auth/login', {
       body: JSON.stringify({ username: username(), password: password() }),
       method: 'POST',
@@ -23,7 +25,12 @@ const Login: Component = () => {
           setError(response.statusText);
         }
       })
-      .catch((error: Error) => setError(error.message));
+      .catch((error: Error) => {
+        setError(error.message);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   return (
@@ -45,8 +52,8 @@ const Login: Component = () => {
           <input
             type="text"
             autofocus
-            class="focus:outline-none mt-0 block w-full border-0 border-b-2 border-dotted border-gray-400 px-0.5 focus:border-black focus:ring-0"
-            placeholder=""
+            class="focus:outline-none mt-1 block w-full border border-black p-1 px-2 focus:border-black focus:ring-0 placeholder:text-sm"
+            placeholder="Enter your username"
             value={username()}
             onChange={(event) => setUsername(event?.currentTarget?.value)}
           />
@@ -55,19 +62,30 @@ const Login: Component = () => {
           <span class="text-sm text-gray-700">Password</span>
           <input
             type="password"
-            class="focus:outline-none mt-0 block w-full border-0 border-b-2 border-dotted border-gray-400 px-0.5 focus:border-black focus:ring-0"
+            class="focus:outline-none mt-1 block w-full border border-black p-1 px-2 focus:border-black focus:ring-0 placeholder:text-sm"
+            placeholder="Enter your password"
             value={password()}
             onChange={(event) => setPassword(event?.currentTarget?.value)}
           />
         </label>
+        <Show when={error()}>
+          <div class="text-rose-700">Error: {error()}</div>
+        </Show>
         <button
           type="submit"
           class="mt-8 rounded-sm bg-white border border-black py-2
                     uppercase text-black hover:shadow-[6px_6px_0_#00000020] 
                     transition-all duration-75"
+          disabled={loading()}
         >
           <div class="relative">
-            <span>Login</span>
+            <Show when={loading()} fallback={<span>Login</span>}>
+              <span class="flex gap-x-1 justify-center">
+                <span class="animate-bounce">.</span>
+                <span class="animate-bounce delay-200">.</span>
+                <span class="animate-bounce delay-400">.</span>
+              </span>
+            </Show>
           </div>
         </button>
       </form>
