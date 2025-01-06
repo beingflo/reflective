@@ -1,4 +1,4 @@
-use crate::{error::AppError, user::S3Data, utils::get_auth_token};
+use crate::{error::AppError, utils::get_auth_token};
 use axum::{
     async_trait,
     extract::{FromRequestParts, State},
@@ -29,7 +29,6 @@ pub struct DBUser {
 pub struct AuthenticatedUser {
     pub id: u64,
     pub username: String,
-    pub config: Option<S3Data>,
 }
 
 #[async_trait]
@@ -58,7 +57,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
 
         let mut stmt = connection.prepare(
             "
-                    SELECT users.id, users.username, users.config 
+                    SELECT users.id, users.username 
                     FROM users INNER JOIN tokens ON tokens.user_id = users.id 
                     WHERE tokens.token = ?1
                 ",
@@ -67,18 +66,10 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         let mut rows = stmt.query([token.value()])?;
 
         let user = match rows.next()? {
-            Some(row) => {
-                let config: Option<String> = row.get(2)?;
-                AuthenticatedUser {
-                    id: row.get(0)?,
-                    username: row.get(1)?,
-                    config: if let Some(config) = config {
-                        serde_json::from_str(&config)?
-                    } else {
-                        None
-                    },
-                }
-            }
+            Some(row) => AuthenticatedUser {
+                id: row.get(0)?,
+                username: row.get(1)?,
+            },
             None => {
                 error!(message = "No user found for token");
                 return Err(AppError::Status(StatusCode::UNAUTHORIZED));

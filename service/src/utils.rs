@@ -1,3 +1,4 @@
+use std::env;
 use std::io::Cursor;
 
 use image::codecs::jpeg::JpegEncoder;
@@ -8,7 +9,6 @@ use s3::creds::Credentials;
 use s3::Bucket;
 
 use crate::error::AppError;
-use crate::user::S3Data;
 
 const AUTH_TOKEN_LENGTH: usize = 64;
 const FILE_NAME_LENGTH: usize = 32;
@@ -31,21 +31,19 @@ pub fn get_file_name() -> String {
         .collect::<String>()
 }
 
-pub fn get_bucket(config: S3Data) -> Result<Bucket, AppError> {
-    let bucket_name = config.bucket;
+pub fn get_bucket() -> Result<Bucket, AppError> {
+    let bucket_name = env::var("BUCKET_NAME").expect("Bucket name must be specified in the env");
+    let region_name = env::var("REGION_NAME").expect("Region must be specified in the env");
+    let endpoint = env::var("ENDPOINT").expect("Endpoint must be specified in the env");
+    let access_key = env::var("ACCESS_KEY").expect("Access key must be specified in the env");
+    let secret_key = env::var("SECRET_KEY").expect("Secret key must be specified in the env");
 
     let region = s3::Region::Custom {
-        region: config.region,
-        endpoint: config.endpoint,
+        region: region_name,
+        endpoint,
     };
 
-    let credentials = Credentials::new(
-        Some(&config.access_key),
-        Some(&config.secret_key),
-        None,
-        None,
-        None,
-    )?;
+    let credentials = Credentials::new(Some(&access_key), Some(&secret_key), None, None, None)?;
 
     Ok(Bucket::new(&bucket_name, region, credentials)?)
 }

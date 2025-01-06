@@ -1,7 +1,6 @@
 import { Route, Router } from '@solidjs/router';
 import type { Component } from 'solid-js';
 import Login from './pages/Login';
-import Config from './pages/Config';
 import View from './pages/View';
 import Upload from './pages/Upload';
 import Signup from './pages/Signup';
@@ -15,7 +14,6 @@ const App: Component = () => {
         <Route path="/" component={View} />
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />
-        <Route path="/config" component={Config} />
         <Route path="/upload" component={Upload} />
         <Route path="*404" component={NotFound} />
       </Router>

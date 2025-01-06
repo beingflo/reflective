@@ -3,8 +3,7 @@ use std::io::Cursor;
 use crate::{
     auth::AuthenticatedUser,
     error::AppError,
-    user::S3Data,
-    utils::{compress_image, format_filename, get_bucket, get_file_name},
+    utils::{compress_image, format_filename, get_file_name},
 };
 use axum::{
     extract::{Multipart, Path, Query, State},
@@ -31,16 +30,6 @@ pub async fn upload_image(
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<StatusCode, AppError> {
-    let config: S3Data = match user.config {
-        Some(c) => c,
-        None => {
-            warn!(message = "user config doesn't exist");
-            return Err(AppError::Status(StatusCode::BAD_REQUEST));
-        }
-    };
-
-    let bucket = get_bucket(config)?;
-
     if let Some(field) = multipart.next_field().await.unwrap() {
         let filename = get_file_name();
         let original_name = format_filename(&filename, "original");
@@ -65,6 +54,8 @@ pub async fn upload_image(
         let original_image = image.decode().unwrap();
         let medium_image = compress_image(&original_image, 2000, 70);
         let small_image = compress_image(&original_image, 1000, 60);
+
+        let bucket = state.bucket;
 
         let original_url = bucket.presign_put(&original_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
         let medium_url = bucket.presign_put(&medium_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
@@ -149,15 +140,7 @@ pub async fn get_image(
 
     check_image_exists(connection, &user.id.to_string(), &id).await?;
 
-    let config: S3Data = match user.config {
-        Some(c) => c,
-        None => {
-            warn!(message = "user config doesn't exist");
-            return Err(AppError::Status(StatusCode::NOT_FOUND));
-        }
-    };
-
-    let bucket = get_bucket(config)?;
+    let bucket = state.bucket;
 
     let name = format_filename(&id, &params.quality);
     let url = bucket.presign_get(format!("/{}", name), UPLOAD_LINK_TIMEOUT_SEC, None)?;

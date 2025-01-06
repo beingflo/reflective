@@ -2,7 +2,6 @@ mod auth;
 mod error;
 mod image;
 mod migration;
-mod user;
 mod utils;
 
 use std::sync::Arc;
@@ -10,25 +9,29 @@ use std::sync::Arc;
 use auth::{login, signup};
 use axum::{
     extract::DefaultBodyLimit,
-    routing::{get, patch, post},
+    routing::{get, post},
     Router,
 };
 use dotenv::dotenv;
 use image::{get_image, get_images, upload_image};
 use migration::apply_migrations;
 use rusqlite::Connection;
+use s3::Bucket;
 use tokio::sync::Mutex;
 use tracing::info;
-use user::update_config;
+use utils::get_bucket;
 
 #[derive(Clone, Debug)]
 pub struct AppState {
     conn: Arc<Mutex<Connection>>,
+    bucket: Arc<Bucket>,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
+
+    let bucket = get_bucket()?;
 
     let subscriber = tracing_subscriber::fmt().finish();
     tracing::subscriber::set_global_default(subscriber)?;
@@ -40,12 +43,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/api/auth/signup", post(signup))
         .route("/api/auth/login", post(login))
-        .route("/api/user/config", patch(update_config))
         .route("/api/images/upload", post(upload_image))
         .route("/api/images", get(get_images))
         .route("/api/images/:id", get(get_image))
         .with_state(AppState {
             conn: Arc::new(Mutex::new(conn)),
+            bucket: Arc::new(bucket),
         })
         .layer(DefaultBodyLimit::disable());
 

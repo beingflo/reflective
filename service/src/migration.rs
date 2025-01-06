@@ -9,8 +9,7 @@ pub fn apply_migrations(connection: &mut Connection) {
             "CREATE TABLE users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, 
                 username TEXT NOT NULL,
-                password TEXT NOT NULL,
-                config TEXT
+                password TEXT NOT NULL
             );",
         ),
         M::up(
