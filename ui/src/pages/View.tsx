@@ -14,7 +14,7 @@ const View: Component = () => {
   });
 
   return (
-    <div class="flex flex-col w-full px-4 md:px-0 md:w-1/3 mx-auto gap-8 md:gap-24 py-12">
+    <div class="flex flex-col w-full px-4 md:px-0 md:w-2/3 mx-auto gap-8 md:gap-24 py-12">
       <For each={images()}>
         {(image) => (
           <div>

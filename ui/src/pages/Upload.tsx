@@ -1,21 +1,39 @@
-import { type Component, onMount, createEffect, createSignal } from 'solid-js';
+import {
+  type Component,
+  onMount,
+  createEffect,
+  createSignal,
+  For,
+} from 'solid-js';
 import { useStore } from '../store';
 import { limitFunction } from 'p-limit';
 
 const Upload: Component = () => {
   const [state] = useStore();
   const [images, setImages] = createSignal([]);
+  const [imageStates, setImageStates] = createSignal({});
   let ref: HTMLInputElement;
+
+  const initializeImageStates = (files: File[]) => {
+    return files.reduce((acc, file) => {
+      acc[file.name] = 'waiting';
+      return acc;
+    }, {});
+  };
 
   onMount(() => {
     ref.addEventListener('change', () => {
-      setImages(Array.from(ref.files));
+      const files = Array.from(ref.files);
+      setImages(files);
+      setImageStates(initializeImageStates(files));
     });
   });
 
   const handleDrop = (event: DragEvent) => {
     event.preventDefault();
-    setImages(Array.from(event.dataTransfer.files));
+    const files = Array.from(event.dataTransfer.files);
+    setImages(files);
+    setImageStates(initializeImageStates(files));
   };
 
   const handleDragOver = (event: DragEvent) => {
@@ -24,13 +42,16 @@ const Upload: Component = () => {
 
   const uploadImage = limitFunction(
     async (image: File) => {
+      setImageStates((prev) => ({ ...prev, [image.name]: 'uploading' }));
       const formData = new FormData();
       formData.append('image', image, 'test');
 
-      const response = await fetch('/api/images/upload', {
+      await fetch('/api/images/upload', {
         body: formData,
         method: 'POST',
-      }).then((response) => response.json());
+      });
+
+      setImageStates((prev) => ({ ...prev, [image.name]: 'done' }));
     },
     { concurrency: 6 },
   );
@@ -40,7 +61,7 @@ const Upload: Component = () => {
   });
 
   return (
-    <div class="mx-auto flex flex-col w-1/2 min-w-96 pt-12">
+    <div class="mx-auto flex flex-col w-1/2 min-w-96 py-12">
       <div class="flex flex-row gap-4 items-baseline">
         <p class="text-4xl md:text-6xl mb-4 text-black dark:text-white font-extrabold">
           Upload
@@ -57,6 +78,16 @@ const Upload: Component = () => {
         </label>
         <input ref={ref} type="file" id="file" class="hidden" multiple />
       </div>
+      <ul class="mt-4">
+        <For each={images()}>
+          {(image) => (
+            <li class="flex justify-between">
+              <span>{image.name}</span>
+              <span>{imageStates()[image.name]}</span>
+            </li>
+          )}
+        </For>
+      </ul>
     </div>
   );
 };
