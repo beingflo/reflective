@@ -24,7 +24,7 @@ use utils::get_bucket;
 #[derive(Clone, Debug)]
 pub struct AppState {
     conn: Arc<Mutex<Connection>>,
-    bucket: Arc<Bucket>,
+    bucket: Arc<Mutex<Bucket>>,
 }
 
 #[tokio::main]
@@ -48,7 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/images/:id", get(get_image))
         .with_state(AppState {
             conn: Arc::new(Mutex::new(conn)),
-            bucket: Arc::new(bucket),
+            bucket: Arc::new(Mutex::new(bucket)),
         })
         .layer(DefaultBodyLimit::disable());
 

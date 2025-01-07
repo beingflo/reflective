@@ -55,11 +55,15 @@ pub async fn upload_image(
         let medium_image = compress_image(&original_image, 2000, 70);
         let small_image = compress_image(&original_image, 1000, 60);
 
-        let bucket = state.bucket;
+        let [original_url, medium_url, small_url] = {
+            let bucket = state.bucket.lock().await;
 
-        let original_url = bucket.presign_put(&original_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
-        let medium_url = bucket.presign_put(&medium_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
-        let small_url = bucket.presign_put(&small_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+            let original = bucket.presign_put(&original_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+            let medium = bucket.presign_put(&medium_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+            let small = bucket.presign_put(&small_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+
+            [original, medium, small]
+        };
 
         info!(
             filename,
@@ -140,7 +144,7 @@ pub async fn get_image(
 
     check_image_exists(connection, &user.id.to_string(), &id).await?;
 
-    let bucket = state.bucket;
+    let bucket = state.bucket.lock().await;
 
     let name = format_filename(&id, &params.quality);
     let url = bucket.presign_get(format!("/{}", name), UPLOAD_LINK_TIMEOUT_SEC, None)?;
