@@ -1,5 +1,6 @@
 import { type Component, onMount, createEffect, createSignal } from 'solid-js';
 import { useStore } from '../store';
+import { limitFunction } from 'p-limit';
 
 const Upload: Component = () => {
   const [state] = useStore();
@@ -21,18 +22,21 @@ const Upload: Component = () => {
     event.preventDefault();
   };
 
-  const uploadImage = async (image: File) => {
-    const formData = new FormData();
-    formData.append('image', image, 'test');
+  const uploadImage = limitFunction(
+    async (image: File) => {
+      const formData = new FormData();
+      formData.append('image', image, 'test');
 
-    const response = await fetch('/api/images/upload', {
-      body: formData,
-      method: 'POST',
-    }).then((response) => response.json());
-  };
+      const response = await fetch('/api/images/upload', {
+        body: formData,
+        method: 'POST',
+      }).then((response) => response.json());
+    },
+    { concurrency: 6 },
+  );
 
   createEffect(() => {
-    images()?.forEach((image) => uploadImage(image));
+    images()?.forEach((image: any) => uploadImage(image));
   });
 
   return (
