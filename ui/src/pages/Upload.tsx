@@ -12,6 +12,15 @@ const Upload: Component = () => {
     });
   });
 
+  const handleDrop = (event: DragEvent) => {
+    event.preventDefault();
+    setImages(Array.from(event.dataTransfer.files));
+  };
+
+  const handleDragOver = (event: DragEvent) => {
+    event.preventDefault();
+  };
+
   const uploadImage = async (image: File) => {
     const formData = new FormData();
     formData.append('image', image, 'test');
@@ -33,13 +42,17 @@ const Upload: Component = () => {
           Upload
         </p>
       </div>
-      <label
-        class="mt-8 text-center px-4 rounded-sm bg-white border border-black py-2 uppercase text-black hover:bg-gray-100 hover:shadow-none focus:outline-none hover:cursor-pointer"
-        for="file"
+      <div
+        class="h-60 mt-8 flex flex-col items-center justify-center border border-dashed border-black py-12"
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
       >
-        Select files
-      </label>
-      <input ref={ref} type="file" id="file" class="hidden" multiple />
+        <label for="file" class="cursor-pointer">
+          <p class="text-black underline inline">Select files</p>
+          <p class="text-black inline"> or drag and drop files here</p>
+        </label>
+        <input ref={ref} type="file" id="file" class="hidden" multiple />
+      </div>
     </div>
   );
 };
