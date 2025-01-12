@@ -6,11 +6,9 @@ import {
   For,
   Show,
 } from 'solid-js';
-import { useStore } from '../store';
 import { limitFunction } from 'p-limit';
 
 const Upload: Component = () => {
-  const [state] = useStore();
   const [images, setImages] = createSignal([]);
   const [imageStates, setImageStates] = createSignal({});
   const [uploadComplete, setUploadComplete] = createSignal(false);

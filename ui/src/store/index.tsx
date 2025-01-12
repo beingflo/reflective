@@ -5,29 +5,21 @@ export const storeName = 'store';
 
 const StoreContext = createContext<any[]>();
 
-const localState = localStorage.getItem(storeName);
-
 export type State = {
-  images: Array<File>;
+  images: Array<String>;
 };
 
-const parsedState: State = localState
-  ? (JSON.parse(localState) as State)
-  : { images: [] };
-
-export const [state, setState] = createStore(parsedState);
+export const [state, setState] = createStore({ images: [] });
 
 export type StoreProviderProps = {
   children: JSX.Element;
 };
 
 export function StoreProvider(props: StoreProviderProps) {
-  createEffect(() => localStorage.setItem(storeName, JSON.stringify(state)));
-
   const store = [
     state,
     {
-      setImages(images: Array<File>) {
+      setImages(images: Array<String>) {
         setState({ images });
       },
     },

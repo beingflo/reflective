@@ -1,8 +1,9 @@
 import { useNavigate } from '@solidjs/router';
 import { createSignal, type Component, createEffect, For } from 'solid-js';
+import { useStore } from '../store';
 
 const View: Component = () => {
-  const [images, setImages] = createSignal([]);
+  const [state, { setImages }] = useStore();
   const navigate = useNavigate();
 
   createEffect(async () => {
@@ -22,7 +23,7 @@ const View: Component = () => {
   return (
     <div>
       <div class="grid grid-cols-1 md:grid-cols-3 md:w-3/4 px-4 py-4 mx-auto gap-8">
-        <For each={images()}>
+        <For each={state.images}>
           {(image) => (
             <div class="aspect-square w-full">
               <img
