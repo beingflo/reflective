@@ -28,6 +28,19 @@ const Lightbox: Component = () => {
     }
   });
 
+  createEffect(() => {
+    const currentIndex = state.images.indexOf(params.id);
+    const nextImage = state.images[currentIndex + 1];
+    const lastImage = state.images[currentIndex - 1];
+
+    if (nextImage) {
+      new Image().src = `/api/images/${nextImage}?quality=original`;
+    }
+    if (lastImage) {
+      new Image().src = `/api/images/${lastImage}?quality=original`;
+    }
+  });
+
   const goToNextImage = () => {
     const currentIndex = state.images.indexOf(params.id);
     const nextImage = state.images[currentIndex + 1];
