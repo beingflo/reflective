@@ -6,12 +6,14 @@ import Upload from './pages/Upload';
 import Signup from './pages/Signup';
 import NotFound from './pages/NotFound';
 import { StoreProvider } from './store';
+import Lightbox from './pages/Lightbox';
 
 const App: Component = () => {
   return (
     <StoreProvider>
       <Router>
         <Route path="/" component={View} />
+        <Route path="/:id" component={Lightbox} />
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />
         <Route path="/upload" component={Upload} />
