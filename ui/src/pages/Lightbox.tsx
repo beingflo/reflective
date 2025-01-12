@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from '@solidjs/router';
-import { onCleanup, type Component } from 'solid-js';
+import { createEffect, onCleanup, type Component } from 'solid-js';
 import { useStore } from '../store';
 import { tinykeys } from 'tinykeys';
 
@@ -13,7 +13,20 @@ export const validateEvent = (callback) => (event) => {
 const Lightbox: Component = () => {
   const params = useParams();
   const navigate = useNavigate();
-  const [state] = useStore();
+  const [state, { setImages }] = useStore();
+
+  // Fetch images in case of reload
+  createEffect(async () => {
+    if (state.images.length === 0) {
+      const response = await fetch('/api/images', {
+        headers: {
+          'content-type': 'application/json',
+        },
+      }).then((response) => response.json());
+
+      setImages(response);
+    }
+  });
 
   const goToNextImage = () => {
     const currentIndex = state.images.indexOf(params.id);

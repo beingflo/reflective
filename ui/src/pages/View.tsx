@@ -1,5 +1,5 @@
 import { useNavigate } from '@solidjs/router';
-import { createSignal, type Component, createEffect, For } from 'solid-js';
+import { type Component, createEffect, For } from 'solid-js';
 import { useStore } from '../store';
 
 const View: Component = () => {
