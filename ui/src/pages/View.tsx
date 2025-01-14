@@ -45,7 +45,7 @@ const View: Component = () => {
   const closeLightbox = () => {
     document
       .getElementById(openImage())
-      ?.scrollIntoView({ behavior: 'smooth' });
+      ?.scrollIntoView({ behavior: 'instant', block: 'center' });
     setOpenImage('');
   };
 
