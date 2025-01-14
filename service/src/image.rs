@@ -52,8 +52,8 @@ pub async fn upload_image(
             .unwrap();
 
         let original_image = image.decode().unwrap();
-        let medium_image = compress_image(&original_image, 2000, 80);
-        let small_image = compress_image(&original_image, 1000, 80);
+        let medium_image = compress_image(&original_image, 2000, 6, 95);
+        let small_image = compress_image(&original_image, 1000, 6, 85);
 
         let [original_url, medium_url, small_url] = {
             let bucket = state.bucket.lock().await;
