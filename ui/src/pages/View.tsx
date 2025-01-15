@@ -21,6 +21,7 @@ export const validateEvent = (callback) => (event) => {
 const View: Component = () => {
   const [state, { setImages }] = useStore();
   const [openImage, setOpenImage] = createSignal('');
+  const navigate = useNavigate();
 
   const goToNextImage = () => {
     if (!openImage()) return;
@@ -62,9 +63,18 @@ const View: Component = () => {
       headers: {
         'content-type': 'application/json',
       },
-    }).then((response) => response.json());
+    }).catch((error) => {
+      console.error('Failed to fetch images:', error);
+      throw error;
+    });
 
-    setImages(response);
+    if (response.status === 401) {
+      navigate('/login');
+      return;
+    }
+
+    const data = await response.json();
+    setImages(data);
   });
 
   const openLightbox = (image: string) => {

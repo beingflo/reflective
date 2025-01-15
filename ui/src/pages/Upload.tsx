@@ -7,12 +7,14 @@ import {
   Show,
 } from 'solid-js';
 import { limitFunction } from 'p-limit';
+import { useNavigate } from '@solidjs/router';
 
 const Upload: Component = () => {
   const [images, setImages] = createSignal([]);
   const [imageStates, setImageStates] = createSignal({});
   const [uploadComplete, setUploadComplete] = createSignal(false);
   let ref: HTMLInputElement;
+  const navigate = useNavigate();
 
   const initializeImageStates = (files: File[]) => {
     return files.reduce((acc, file) => {
@@ -46,12 +48,19 @@ const Upload: Component = () => {
       const formData = new FormData();
       formData.append('image', image, 'test');
 
-      await fetch('/api/images/upload', {
+      const response = await fetch('/api/images/upload', {
         body: formData,
         method: 'POST',
+      }).catch((error) => {
+        console.error('Failed to upload image:', error);
+        throw error;
       });
 
-      setImageStates((prev) => ({ ...prev, [image.name]: 'done' }));
+      if (response.status === 401) {
+        navigate('/login');
+      } else {
+        setImageStates((prev) => ({ ...prev, [image.name]: 'done' }));
+      }
     },
     { concurrency: 4 },
   );
