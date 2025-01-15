@@ -11,7 +11,7 @@ use axum::{
     response::Redirect,
     Json,
 };
-use image::ImageReader;
+use image::{GenericImageView, ImageReader};
 use reqwest::Client;
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -52,8 +52,10 @@ pub async fn upload_image(
             .unwrap();
 
         let original_image = image.decode().unwrap();
-        let medium_image = compress_image(&original_image, 2000, 6, 95);
-        let small_image = compress_image(&original_image, 1000, 6, 85);
+        let medium_dimension = std::cmp::min(original_image.dimensions().0 / 2, 2000);
+        let medium_image = compress_image(&original_image, medium_dimension, 6, 80);
+        let small_dimension = std::cmp::min(original_image.dimensions().0 / 4, 1000);
+        let small_image = compress_image(&original_image, small_dimension, 6, 80);
 
         let [original_url, medium_url, small_url] = {
             let bucket = state.bucket.lock().await;
