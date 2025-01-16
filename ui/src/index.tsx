@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web';
 
-import App from './App';
 import './index.css';
+import Bootstrap from './Bootstrap';
 
-render(() => <App />, document.getElementById('root'));
+render(() => <Bootstrap />, document.getElementById('root'));

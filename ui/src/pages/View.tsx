@@ -10,13 +10,7 @@ import {
 import { useStore } from '../store';
 import Lightbox from '../components/Lightbox';
 import { tinykeys } from 'tinykeys';
-
-export const validateEvent = (callback) => (event) => {
-  if (event.target.tagName !== 'INPUT' && event.target.tagName !== 'TEXTAREA') {
-    event.preventDefault();
-    callback();
-  }
-};
+import { validateEvent } from '../utils';
 
 const View: Component = () => {
   const [state, { setImages }] = useStore();
@@ -54,6 +48,7 @@ const View: Component = () => {
     ArrowRight: validateEvent(goToNextImage),
     ArrowLeft: validateEvent(goToLastImage),
     Escape: closeLightbox,
+    u: validateEvent(() => navigate('/upload')),
   });
 
   onCleanup(cleanup);

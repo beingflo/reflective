@@ -1,3 +1,5 @@
+export type Screen = 'app' | 'upload';
+
 export type UpdateConfigRequest = {
   bucket: string;
   endpoint: string;

@@ -5,9 +5,11 @@ import {
   createSignal,
   For,
   Show,
+  onCleanup,
 } from 'solid-js';
 import { limitFunction } from 'p-limit';
 import { useNavigate } from '@solidjs/router';
+import { tinykeys } from 'tinykeys';
 
 const Upload: Component = () => {
   const [images, setImages] = createSignal([]);
@@ -15,6 +17,12 @@ const Upload: Component = () => {
   const [uploadComplete, setUploadComplete] = createSignal(false);
   let ref: HTMLInputElement;
   const navigate = useNavigate();
+
+  const cleanup = tinykeys(window, {
+    Escape: () => navigate('/'),
+  });
+
+  onCleanup(cleanup);
 
   const initializeImageStates = (files: File[]) => {
     return files.reduce((acc, file) => {
