@@ -97,19 +97,24 @@ const Upload: Component = () => {
       <Show when={uploadComplete()}>
         <div class="text-emerald-700 mt-4">Upload complete!</div>
       </Show>
-      <Show when={images()?.length === 0}>
-        <div
-          class="h-60 mt-8 flex flex-col items-center justify-center border border-dashed border-black py-12"
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-        >
-          <label for="file" class="cursor-pointer">
-            <p class="text-black underline inline">Select files</p>
-            <p class="text-black inline"> or drag and drop files here</p>
-          </label>
-          <input ref={ref} type="file" id="file" class="hidden" multiple />
-        </div>
-      </Show>
+      <div
+        class="h-60 mt-8 flex flex-col items-center justify-center border border-dashed border-black py-12"
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+      >
+        <label for="file" class="cursor-pointer">
+          <p class="text-black underline inline">Select files</p>
+          <p class="text-black inline"> or drag and drop files here</p>
+        </label>
+        <input
+          disabled={images()?.length > 0}
+          ref={ref}
+          type="file"
+          id="file"
+          class="hidden"
+          multiple
+        />
+      </div>
       <ul class="mt-4">
         <For each={images()}>
           {(image) => (
