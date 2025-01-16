@@ -43,6 +43,8 @@ pub async fn upload_image(
                 "INSERT INTO images (filename, user_id) VALUES (?1, ?2)",
                 (&filename, &user.id),
             )?;
+
+            drop(connection);
         }
 
         let image_data = field.bytes().await.unwrap();
@@ -63,6 +65,8 @@ pub async fn upload_image(
             let original = bucket.presign_put(&original_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
             let medium = bucket.presign_put(&medium_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
             let small = bucket.presign_put(&small_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+
+            drop(bucket);
 
             [original, medium, small]
         };
