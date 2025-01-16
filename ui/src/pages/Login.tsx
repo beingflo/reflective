@@ -34,7 +34,7 @@ const Login: Component = () => {
   };
 
   return (
-    <div class="mx-auto flex flex-col w-1/4 min-w-96 pt-12">
+    <div class="mx-auto flex flex-col w-1/4 min-w-96 pt-8 px-4 md:pt-12 md:px-0">
       <div class="flex flex-row gap-4 items-baseline">
         <p class="text-4xl md:text-6xl mb-4 text-black dark:text-white font-extrabold">
           Login
