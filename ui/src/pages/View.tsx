@@ -53,7 +53,7 @@ const View: Component = () => {
 
   onCleanup(cleanup);
 
-  // Load to top of page on refresh
+  // Scroll to top of page on refresh
   window.onbeforeunload = function () {
     window.scrollTo(0, 0);
   };
