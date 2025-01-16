@@ -24,6 +24,9 @@ const Upload: Component = () => {
 
   onCleanup(cleanup);
 
+  const uploaded = () =>
+    Object.values(imageStates()).filter((state) => state === 'done').length;
+
   const initializeImageStates = (files: File[]) => {
     return files.reduce((acc, file) => {
       acc[file.name] = 'waiting';
@@ -80,6 +83,7 @@ const Upload: Component = () => {
     ) {
       setImages([]);
       setUploadComplete(true);
+      setImageStates({});
     }
   });
 
@@ -115,6 +119,11 @@ const Upload: Component = () => {
           multiple
         />
       </div>
+      <Show when={Object.values(imageStates())?.length > 0}>
+        <div class="mt-4">
+          Uploaded {uploaded()} / {Object.values(imageStates())?.length}
+        </div>
+      </Show>
       <ul class="mt-4">
         <For each={images()}>
           {(image) => (
