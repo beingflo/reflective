@@ -10,6 +10,14 @@ const Signup: Component = () => {
 
   const submit = (event: Event): void => {
     event.preventDefault();
+    setError('');
+    setSuccess(false);
+
+    if (!username() || !password()) {
+      setError('Please enter a username and password.');
+      return;
+    }
+
     setLoading(true);
 
     fetch('/api/auth/signup', {
@@ -50,6 +58,18 @@ const Signup: Component = () => {
         </a>
       </div>
       <form onSubmit={submit} class="w-full flex flex-col gap-6 mt-12">
+        <Show when={error()}>
+          <div class="text-rose-700">Error: {error()}</div>
+        </Show>
+        <Show when={success()}>
+          <div class="text-emerald-700">
+            Account creation successful. Please{' '}
+            <a href="/login" class="text-blue-600 underline">
+              login
+            </a>
+            .
+          </div>
+        </Show>
         <label class="block">
           <span class="text-sm text-gray-700">Username</span>
           <input
@@ -70,18 +90,6 @@ const Signup: Component = () => {
             onChange={(event) => setPassword(event?.currentTarget?.value)}
           />
         </label>
-        <Show when={error()}>
-          <div class="text-rose-700">Error: {error()}</div>
-        </Show>
-        <Show when={success()}>
-          <div class="text-emerald-700">
-            Account creation successful. Please{' '}
-            <a href="/login" class="text-blue-600 underline">
-              login
-            </a>
-            .
-          </div>
-        </Show>
         <button
           type="submit"
           class="mt-8 rounded-sm bg-white border border-black py-2

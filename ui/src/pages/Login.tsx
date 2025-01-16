@@ -10,6 +10,12 @@ const Login: Component = () => {
 
   const submit = (event: Event): void => {
     event.preventDefault();
+
+    if (!username() || !password()) {
+      setError('Please enter a username and password.');
+      return;
+    }
+
     setLoading(true);
     fetch('/api/auth/login', {
       body: JSON.stringify({ username: username(), password: password() }),
@@ -47,6 +53,9 @@ const Login: Component = () => {
         </a>
       </div>
       <form onSubmit={submit} class="w-full flex flex-col gap-6 mt-12">
+        <Show when={error()}>
+          <div class="text-rose-700">Error: {error()}</div>
+        </Show>
         <label class="block">
           <span class="text-sm text-gray-700">Username</span>
           <input
@@ -68,9 +77,6 @@ const Login: Component = () => {
             onChange={(event) => setPassword(event?.currentTarget?.value)}
           />
         </label>
-        <Show when={error()}>
-          <div class="text-rose-700">Error: {error()}</div>
-        </Show>
         <button
           type="submit"
           class="mt-8 rounded-sm bg-white border border-black py-2
