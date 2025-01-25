@@ -40,7 +40,7 @@ pub async fn upload_image(
             let connection = state.conn.lock().await;
 
             connection.execute(
-                "INSERT INTO images (filename, user_id) VALUES (?1, ?2)",
+                "INSERT INTO image (filename, user_id) VALUES (?1, ?2)",
                 (&filename, &user.id),
             )?;
 
@@ -114,7 +114,7 @@ pub async fn get_images(
     let mut stmt = connection.prepare(
         "
             SELECT filename 
-            FROM images
+            FROM image
             WHERE user_id = ?1
         ",
     )?;
@@ -170,7 +170,7 @@ async fn check_image_exists(
     let mut stmt = connection.prepare(
         "
             SELECT filename
-            FROM images
+            FROM image
             WHERE user_id = ?1 AND filename = ?2
         ",
     )?;

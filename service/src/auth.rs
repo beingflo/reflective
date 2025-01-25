@@ -57,9 +57,9 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
 
         let mut stmt = connection.prepare(
             "
-                    SELECT users.id, users.username 
-                    FROM users INNER JOIN tokens ON tokens.user_id = users.id 
-                    WHERE tokens.token = ?1
+                    SELECT user.id, user.username 
+                    FROM user INNER JOIN token ON token.user_id = user.id 
+                    WHERE token.token = ?1
                 ",
         )?;
 
@@ -89,7 +89,7 @@ pub async fn signup(
         let connection = state.conn.lock().await;
 
         let mut stmt =
-            connection.prepare("SELECT username, password FROM users WHERE username = ?1")?;
+            connection.prepare("SELECT username, password FROM user WHERE username = ?1")?;
 
         let mut rows = stmt.query([&user.username])?;
 
@@ -108,7 +108,7 @@ pub async fn signup(
     let connection = state.conn.lock().await;
 
     connection.execute(
-        "INSERT INTO users (username, password) VALUES (?1, ?2)",
+        "INSERT INTO user (username, password) VALUES (?1, ?2)",
         (&user.username, password),
     )?;
 
@@ -125,7 +125,7 @@ pub async fn login(
     let db_user = {
         let connection = state.conn.lock().await;
 
-        let mut stmt = connection.prepare("SELECT id, password FROM users WHERE username = ?1")?;
+        let mut stmt = connection.prepare("SELECT id, password FROM user WHERE username = ?1")?;
         let mut rows = stmt.query([user.username])?;
 
         let db_user = match rows.next()? {
@@ -156,7 +156,7 @@ pub async fn login(
     let connection = state.conn.lock().await;
 
     connection.execute(
-        "INSERT INTO tokens (token, user_id) VALUES (?1, ?2)",
+        "INSERT INTO token (token, user_id) VALUES (?1, ?2)",
         (&auth_token, &db_user.id),
     )?;
 
