@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_syeqzYReMy
 createdAt: 2025-02-22T13:00:17.478298
-updatedAt: 2025-02-22T13:01:27.339791
+updatedAt: 2025-02-22T18:38:32.437004
 workspaceId: wk_2iqsX2rPhP
 folderId: fl_NF56fseXRY
 authentication: {}
@@ -12,9 +12,9 @@ body:
   - enabled: true
     file: /Users/florian/Images/2023/Japan/DSCF2225.jpg
     id: pYvCBcY4ye
-    name: image
+    name: asf
   - enabled: true
-    id: 5fFSUdEKug
+    id: D7FIBbPz0m
     name: ''
     value: ''
 bodyType: multipart/form-data

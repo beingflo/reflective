@@ -18,6 +18,8 @@ pub enum AppError {
     S3Error(#[from] s3::error::S3Error),
     #[error("Credentials error {0}")]
     CredentialsError(#[from] s3::creds::error::CredentialsError),
+    #[error("Image error {0}")]
+    ImageError(#[from] image::ImageError),
 }
 
 impl IntoResponse for AppError {
@@ -37,6 +39,9 @@ impl IntoResponse for AppError {
             }
             AppError::CredentialsError(error) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
+            }
+            AppError::ImageError(error) => {
+                (StatusCode::BAD_REQUEST, error.to_string()).into_response()
             }
         }
     }

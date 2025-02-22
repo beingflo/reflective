@@ -1,12 +1,12 @@
 use std::env;
 use std::io::Cursor;
 
-use image::codecs::avif::AvifEncoder;
 use image::DynamicImage;
-use rand::distributions::Alphanumeric;
+use image::codecs::avif::AvifEncoder;
 use rand::Rng;
-use s3::creds::Credentials;
+use rand::distributions::Alphanumeric;
 use s3::Bucket;
+use s3::creds::Credentials;
 
 use crate::error::AppError;
 
@@ -23,7 +23,7 @@ pub fn get_auth_token() -> String {
 }
 
 /// Get a random file name
-pub fn get_file_name() -> String {
+pub fn get_file_id() -> String {
     rand::rngs::OsRng
         .sample_iter(&Alphanumeric)
         .take(FILE_NAME_LENGTH)
@@ -52,8 +52,17 @@ pub fn format_filename(filename: &str, quality: &str) -> String {
     format!("{}-{}", filename, quality)
 }
 
-pub fn compress_image(original: &DynamicImage, size: u32, speed: u8, quality: u8) -> Vec<u8> {
-    let image = original.resize(size, size, image::imageops::FilterType::Triangle);
+pub fn compress_image(
+    original: &DynamicImage,
+    dimensions: (u32, u32),
+    speed: u8,
+    quality: u8,
+) -> Vec<u8> {
+    let image = original.resize(
+        dimensions.0,
+        dimensions.1,
+        image::imageops::FilterType::Triangle,
+    );
 
     let mut bytes: Vec<u8> = Vec::new();
 

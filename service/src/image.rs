@@ -3,20 +3,21 @@ use std::io::Cursor;
 use crate::{
     auth::AuthenticatedUser,
     error::AppError,
-    utils::{compress_image, format_filename, get_file_name},
+    utils::{compress_image, format_filename, get_file_id},
 };
 use axum::{
+    Json,
     extract::{Multipart, Path, Query, State},
     http::StatusCode,
     response::Redirect,
-    Json,
 };
+use futures::join;
 use image::{GenericImageView, ImageReader};
 use reqwest::Client;
-use rusqlite::Connection;
+use rusqlite::{Connection, params};
 use serde::Deserialize;
 use tokio::sync::MutexGuard;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use crate::AppState;
 
@@ -31,21 +32,11 @@ pub async fn upload_image(
     mut multipart: Multipart,
 ) -> Result<StatusCode, AppError> {
     if let Some(field) = multipart.next_field().await.unwrap() {
-        let filename = get_file_name();
-        let original_name = format_filename(&filename, "original");
-        let medium_name = format_filename(&filename, "medium");
-        let small_name = format_filename(&filename, "small");
+        let filename = field.name().map(|n| n.into()).unwrap_or(get_file_id());
 
-        {
-            let connection = state.conn.lock().await;
+        let image_id: u64;
 
-            connection.execute(
-                "INSERT INTO image (filename, user_id) VALUES (?1, ?2)",
-                (&filename, &user.id),
-            )?;
-
-            drop(connection);
-        }
+        info!(message = "uploading image", filename);
 
         let image_data = field.bytes().await.unwrap();
 
@@ -53,18 +44,83 @@ pub async fn upload_image(
             .with_guessed_format()
             .unwrap();
 
+        {
+            let connection = state.conn.lock().await;
+            let mut stmt = connection.prepare(
+                "
+                    SELECT filename 
+                    FROM image
+                    WHERE user_id = ?1 AND filename = ?2
+                ",
+            )?;
+
+            let mut result = stmt.query(params![user.id, filename])?;
+            if let Some(_) = result.next()? {
+                error!(message = "image already exists");
+                return Err(AppError::Status(StatusCode::CONFLICT));
+            };
+
+            let mut stmt = connection
+                .prepare("INSERT INTO image (filename, user_id) VALUES (?1, ?2) RETURNING id")?;
+
+            let mut result = stmt.query(params![filename, user.id])?;
+            match result.next()? {
+                Some(row) => {
+                    image_id = row.get(0)?;
+                }
+                None => {
+                    error!(message = "failed to insert image");
+                    return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR));
+                }
+            }
+        }
+
         let original_image = image.decode().unwrap();
-        let medium_dimension = std::cmp::min(original_image.dimensions().0 / 2, 2000);
-        let medium_image = compress_image(&original_image, medium_dimension, 6, 80);
-        let small_dimension = std::cmp::min(original_image.dimensions().0 / 4, 1000);
-        let small_image = compress_image(&original_image, small_dimension, 6, 80);
+
+        let dimensions = original_image.dimensions();
+        let medium_dimension = (
+            original_image.dimensions().0 / 2,
+            original_image.dimensions().1 / 2,
+        );
+        let small_dimension = (
+            original_image.dimensions().0 / 4,
+            original_image.dimensions().1 / 4,
+        );
+
+        let original_quality = 100;
+        let medium_quality = 80;
+        let small_quality = 80;
+
+        let medium_image = compress_image(&original_image, medium_dimension, 6, medium_quality);
+        let small_image = compress_image(&original_image, small_dimension, 6, small_quality);
+
+        let id_original = get_file_id();
+        let id_medium = get_file_id();
+        let id_small = get_file_id();
+
+        {
+            let connection = state.conn.lock().await;
+
+            connection.execute(
+                "INSERT INTO variant (filename, width, height, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5)",
+                (&id_original, dimensions.0, dimensions.1, original_quality, image_id),
+            )?;
+            connection.execute(
+                "INSERT INTO variant (filename, width, height, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5)",
+                (&id_medium, medium_dimension.0, medium_dimension.1, medium_quality, image_id),
+            )?;
+            connection.execute(
+                "INSERT INTO variant (filename, width, height, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5)",
+                (&id_small, small_dimension.0, small_dimension.1, small_quality, image_id),
+            )?;
+        }
 
         let [original_url, medium_url, small_url] = {
             let bucket = state.bucket.lock().await;
 
-            let original = bucket.presign_put(&original_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
-            let medium = bucket.presign_put(&medium_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
-            let small = bucket.presign_put(&small_name, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+            let original = bucket.presign_put(&id_original, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+            let medium = bucket.presign_put(&id_medium, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+            let small = bucket.presign_put(&id_small, UPLOAD_LINK_TIMEOUT_SEC, None)?;
 
             drop(bucket);
 
@@ -79,24 +135,26 @@ pub async fn upload_image(
         );
 
         let client = Client::new();
-        client
-            .put(original_url)
-            .body(image_data)
-            .send()
-            .await
-            .unwrap();
-        client
-            .put(medium_url)
-            .body(medium_image)
-            .send()
-            .await
-            .unwrap();
-        client
-            .put(small_url)
-            .body(small_image)
-            .send()
-            .await
-            .unwrap();
+        let original_fut = client.put(original_url).body(image_data).send();
+        let medium_fut = client.put(medium_url).body(medium_image).send();
+        let small_fut = client.put(small_url).body(small_image).send();
+
+        let (original_res, medium_res, small_res) = join!(original_fut, medium_fut, small_fut);
+
+        if let Err(e) = original_res {
+            error!(message = "failed to upload original image", error = ?e);
+            return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR));
+        }
+
+        if let Err(e) = medium_res {
+            error!(message = "failed to upload medium image", error = ?e);
+            return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR));
+        }
+
+        if let Err(e) = small_res {
+            error!(message = "failed to upload small image", error = ?e);
+            return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR));
+        }
     }
 
     Ok(StatusCode::OK)
