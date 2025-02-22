@@ -2,9 +2,9 @@ type: folder
 model: folder
 id: fl_2xEN7557Ew
 createdAt: 2025-02-22T12:46:31.305211
-updatedAt: 2025-02-22T12:52:28.959554
+updatedAt: 2025-02-22T13:00:19.862071
 workspaceId: wk_2iqsX2rPhP
 folderId: null
 name: auth
 description: ''
-sortPriority: 1000.0
+sortPriority: 0.0
