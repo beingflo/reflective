@@ -1,0 +1,10 @@
+type: workspace
+model: workspace
+id: wk_2iqsX2rPhP
+createdAt: 2025-02-22T12:46:16.476255
+updatedAt: 2025-02-22T12:46:16.476256
+name: reflective
+description: ''
+settingValidateCertificates: true
+settingFollowRedirects: true
+settingRequestTimeout: 0
