@@ -23,11 +23,11 @@
     "prettier": "2.8.8",
     "tailwindcss": "3.4.1",
     "typescript": "5.3.3",
-    "vite": "5.4.10",
-    "vite-plugin-solid": "2.10.2"
+    "vite": "^6.1.0",
+    "vite-plugin-solid": "^2.11.0"
   },
   "dependencies": {
-    "@solidjs/router": "^0.14.10",
+    "@solidjs/router": "^0.15.0",
     "p-limit": "^6.2.0",
     "solid-js": "^1.9.0",
     "tinykeys": "^3.0.0"
