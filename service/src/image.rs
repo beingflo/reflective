@@ -1,9 +1,9 @@
-use std::io::Cursor;
+use std::{io::Cursor, sync::Arc};
 
 use crate::{
     auth::AuthenticatedUser,
     error::AppError,
-    utils::{compress_image, format_filename, get_file_id},
+    utils::{compress_image, get_file_id},
 };
 use axum::{
     Json,
@@ -16,7 +16,7 @@ use image::{GenericImageView, ImageReader};
 use reqwest::Client;
 use rusqlite::{Connection, params};
 use serde::Deserialize;
-use tokio::sync::MutexGuard;
+use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
 use crate::AppState;
@@ -102,16 +102,16 @@ pub async fn upload_image(
             let connection = state.conn.lock().await;
 
             connection.execute(
-                "INSERT INTO variant (filename, width, height, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5)",
-                (&id_original, dimensions.0, dimensions.1, original_quality, image_id),
+                "INSERT INTO variant (filename, width, height, compression_quality, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                (&id_original, dimensions.0, dimensions.1, original_quality, "original", image_id),
             )?;
             connection.execute(
-                "INSERT INTO variant (filename, width, height, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5)",
-                (&id_medium, medium_dimension.0, medium_dimension.1, medium_quality, image_id),
+                "INSERT INTO variant (filename, width, height, compression_quality, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                (&id_medium, medium_dimension.0, medium_dimension.1, medium_quality, "medium", image_id),
             )?;
             connection.execute(
-                "INSERT INTO variant (filename, width, height, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5)",
-                (&id_small, small_dimension.0, small_dimension.1, small_quality, image_id),
+                "INSERT INTO variant (filename, width, height, compression_quality, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                (&id_small, small_dimension.0, small_dimension.1, small_quality, "small", image_id),
             )?;
         }
 
@@ -171,13 +171,13 @@ pub async fn get_images(
 
     let mut stmt = connection.prepare(
         "
-            SELECT filename 
+            SELECT id 
             FROM image
-            WHERE user_id = ?1
+            WHERE user_id = ?1;
         ",
     )?;
 
-    let files = stmt.query_map([user.id], |row| Ok(row.get(0)?))?;
+    let files = stmt.query_map([user.id], |row| Ok(row.get::<usize, usize>(0)?.to_string()))?;
 
     let files = files.collect::<Result<Vec<_>, _>>()?;
 
@@ -196,24 +196,50 @@ pub struct QueryParams {
     id = %id,
     quality = %params.quality
 ))]
+#[axum::debug_handler]
 pub async fn get_image(
     user: AuthenticatedUser,
     Path(id): Path<String>,
     params: Query<QueryParams>,
     State(state): State<AppState>,
 ) -> Result<Redirect, AppError> {
-    let connection = state.conn.lock().await;
-
     info!(message = "get image");
 
-    check_image_exists(connection, &user.id.to_string(), &id).await?;
+    check_image_exists(state.conn.clone(), &user.id.to_string(), &id).await?;
 
+    let connection = state.conn.lock().await;
     let bucket = state.bucket.lock().await;
 
-    let name = format_filename(&id, &params.quality);
-    let url = bucket.presign_get(format!("/{}", name), UPLOAD_LINK_TIMEOUT_SEC, None)?;
+    let mut stmt = connection.prepare(
+        "
+            SELECT variant.filename
+            FROM variant INNER JOIN image ON variant.image_id = image.id
+            WHERE image.user_id = ?1 AND image.id = ?2 AND variant.quality = ?3;
+        ",
+    )?;
 
-    return Ok(Redirect::temporary(&url));
+    let mut files = stmt.query_map(
+        [
+            user.id.to_string(),
+            id.to_string(),
+            params.quality.to_string(),
+        ],
+        |row| Ok(row.get(0)?),
+    )?;
+
+    let file: Option<Result<String, _>> = files.next();
+
+    match file {
+        Some(Ok(name)) => {
+            let url = bucket.presign_get(format!("/{}", name), UPLOAD_LINK_TIMEOUT_SEC, None)?;
+
+            return Ok(Redirect::temporary(&url));
+        }
+        _ => {
+            warn!(message = "image with requested quality doesn't exist");
+            return Err(AppError::Status(StatusCode::NOT_FOUND));
+        }
+    }
 }
 
 #[tracing::instrument(skip_all, fields(
@@ -221,15 +247,16 @@ pub async fn get_image(
     image_id = %image_id,
 ))]
 async fn check_image_exists(
-    connection: MutexGuard<'_, Connection>,
+    connection: Arc<Mutex<Connection>>,
     user_id: &str,
     image_id: &str,
 ) -> Result<(), AppError> {
+    let connection = connection.lock().await;
     let mut stmt = connection.prepare(
         "
             SELECT filename
             FROM image
-            WHERE user_id = ?1 AND filename = ?2
+            WHERE user_id = ?1 AND id = ?2
         ",
     )?;
 

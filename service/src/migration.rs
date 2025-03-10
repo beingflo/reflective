@@ -1,5 +1,5 @@
 use rusqlite::Connection;
-use rusqlite_migration::{Migrations, M};
+use rusqlite_migration::{M, Migrations};
 use tracing::{error, info};
 
 #[tracing::instrument(skip_all)]
@@ -36,7 +36,8 @@ pub fn apply_migrations(connection: &mut Connection) {
                 filename TEXT NOT NULL,
                 width INTEGER NOT NULL,
                 height INTEGER NOT NULL,
-                quality INTEGER NOT NULL,
+                compression_quality INTEGER NOT NULL,
+                quality TEXT NOT NULL, 
                 image_id INTEGER NOT NULL,
                 FOREIGN KEY (image_id)
                     REFERENCES image (id) 

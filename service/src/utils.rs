@@ -48,10 +48,6 @@ pub fn get_bucket() -> Result<Bucket, AppError> {
     Ok(Bucket::new(&bucket_name, region, credentials)?)
 }
 
-pub fn format_filename(filename: &str, quality: &str) -> String {
-    format!("{}-{}", filename, quality)
-}
-
 pub fn compress_image(
     original: &DynamicImage,
     dimensions: (u32, u32),
