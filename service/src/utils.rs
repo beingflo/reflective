@@ -2,7 +2,7 @@ use std::env;
 use std::io::Cursor;
 
 use image::DynamicImage;
-use image::codecs::avif::AvifEncoder;
+use image::codecs::jpeg::JpegEncoder;
 use rand::Rng;
 use rand::distributions::Alphanumeric;
 use s3::Bucket;
@@ -48,12 +48,7 @@ pub fn get_bucket() -> Result<Bucket, AppError> {
     Ok(Bucket::new(&bucket_name, region, credentials)?)
 }
 
-pub fn compress_image(
-    original: &DynamicImage,
-    dimensions: (u32, u32),
-    speed: u8,
-    quality: u8,
-) -> Vec<u8> {
+pub fn compress_image(original: &DynamicImage, dimensions: (u32, u32), quality: u8) -> Vec<u8> {
     let image = original.resize(
         dimensions.0,
         dimensions.1,
@@ -64,7 +59,7 @@ pub fn compress_image(
 
     let write = Cursor::new(&mut bytes);
 
-    let encoder = AvifEncoder::new_with_speed_quality(write, speed, quality);
+    let encoder = JpegEncoder::new_with_quality(write, quality);
     image.write_with_encoder(encoder).unwrap();
 
     bytes

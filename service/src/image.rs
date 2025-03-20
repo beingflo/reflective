@@ -91,8 +91,8 @@ pub async fn upload_image(
         let medium_quality = 80;
         let small_quality = 80;
 
-        let medium_image = compress_image(&original_image, medium_dimension, 6, medium_quality);
-        let small_image = compress_image(&original_image, small_dimension, 6, small_quality);
+        let medium_image = compress_image(&original_image, medium_dimension, medium_quality);
+        let small_image = compress_image(&original_image, small_dimension, small_quality);
 
         let id_original = get_file_id();
         let id_medium = get_file_id();
