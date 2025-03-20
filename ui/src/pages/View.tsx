@@ -81,25 +81,55 @@ const View: Component = () => {
     setOpenImage(image);
   };
 
+  const leftImages = () => state.images.filter((_, idx) => idx % 3 === 0);
+  const middleImages = () => state.images.filter((_, idx) => idx % 3 === 1);
+  const rightImages = () => state.images.filter((_, idx) => idx % 3 === 2);
+
   return (
     <div>
       <Show when={openImage()}>
         <Lightbox imageId={openImage()} />
       </Show>
-      <div class="grid grid-cols-1 md:grid-cols-3 md:w-3/4 px-4 py-4 mx-auto gap-8">
-        <For each={state.images}>
-          {(image) => (
-            <div class="aspect-square w-full">
+      <div class="flex flex-row gap-4 px-8 max-w-screen-2xl mx-auto">
+        <div class="flex flex-col gap-4 w-1/3">
+          <For each={leftImages()}>
+            {(image) => (
               <img
-                class="object-cover w-full h-full"
+                class="object-fill w-full min-h-24"
                 id={image}
                 loading="lazy"
                 onClick={() => openLightbox(image)}
                 src={`/api/images/${image}?quality=small`}
               />
-            </div>
-          )}
-        </For>
+            )}
+          </For>
+        </div>
+        <div class="flex flex-col gap-4 w-1/3">
+          <For each={middleImages()}>
+            {(image) => (
+              <img
+                class="object-fill w-full min-h-24"
+                id={image}
+                loading="lazy"
+                onClick={() => openLightbox(image)}
+                src={`/api/images/${image}?quality=small`}
+              />
+            )}
+          </For>
+        </div>
+        <div class="flex flex-col gap-4 w-1/3">
+          <For each={rightImages()}>
+            {(image) => (
+              <img
+                class="object-fill w-full min-h-24"
+                id={image}
+                loading="lazy"
+                onClick={() => openLightbox(image)}
+                src={`/api/images/${image}?quality=small`}
+              />
+            )}
+          </For>
+        </div>
       </div>
     </div>
   );
