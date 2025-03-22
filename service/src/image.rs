@@ -3,7 +3,7 @@ use std::{io::Cursor, sync::Arc};
 use crate::{
     auth::AuthenticatedUser,
     error::AppError,
-    utils::{compress_image, get_file_id},
+    utils::{compress_image, get_id, get_object_name},
 };
 use axum::{
     Json,
@@ -32,9 +32,9 @@ pub async fn upload_image(
     mut multipart: Multipart,
 ) -> Result<StatusCode, AppError> {
     if let Some(field) = multipart.next_field().await.unwrap() {
-        let filename = field.name().map(|n| n.into()).unwrap_or(get_file_id());
+        let filename: String = field.name().map(|n| n.into()).unwrap();
 
-        let image_id: u64;
+        let image_id: String;
 
         info!(message = "uploading image", filename);
 
@@ -60,10 +60,13 @@ pub async fn upload_image(
                 return Err(AppError::Status(StatusCode::CONFLICT));
             };
 
-            let mut stmt = connection
-                .prepare("INSERT INTO image (filename, user_id) VALUES (?1, ?2) RETURNING id")?;
+            let new_id = get_id();
 
-            let mut result = stmt.query(params![filename, user.id])?;
+            let mut stmt = connection.prepare(
+                "INSERT INTO image (id, filename, user_id) VALUES (?1, ?2, ?3) RETURNING id",
+            )?;
+
+            let mut result = stmt.query(params![new_id, filename, user.id])?;
             match result.next()? {
                 Some(row) => {
                     image_id = row.get(0)?;
@@ -94,33 +97,34 @@ pub async fn upload_image(
         let medium_image = compress_image(&original_image, medium_dimension, medium_quality);
         let small_image = compress_image(&original_image, small_dimension, small_quality);
 
-        let id_original = get_file_id();
-        let id_medium = get_file_id();
-        let id_small = get_file_id();
+        let object_name_original = get_object_name();
+        let object_name_medium = get_object_name();
+        let object_name_small = get_object_name();
 
         {
             let connection = state.conn.lock().await;
 
             connection.execute(
-                "INSERT INTO variant (filename, width, height, compression_quality, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                (&id_original, dimensions.0, dimensions.1, original_quality, "original", image_id),
+                "INSERT INTO variant (object_name, width, height, compression_quality, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                (&object_name_original, dimensions.0, dimensions.1, original_quality, "original", &image_id),
             )?;
             connection.execute(
-                "INSERT INTO variant (filename, width, height, compression_quality, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                (&id_medium, medium_dimension.0, medium_dimension.1, medium_quality, "medium", image_id),
+                "INSERT INTO variant (object_name, width, height, compression_quality, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                (&object_name_medium, medium_dimension.0, medium_dimension.1, medium_quality, "medium", &image_id),
             )?;
             connection.execute(
-                "INSERT INTO variant (filename, width, height, compression_quality, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                (&id_small, small_dimension.0, small_dimension.1, small_quality, "small", image_id),
+                "INSERT INTO variant (object_name, width, height, compression_quality, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                (&object_name_small, small_dimension.0, small_dimension.1, small_quality, "small", &image_id),
             )?;
         }
 
         let [original_url, medium_url, small_url] = {
             let bucket = state.bucket.lock().await;
 
-            let original = bucket.presign_put(&id_original, UPLOAD_LINK_TIMEOUT_SEC, None)?;
-            let medium = bucket.presign_put(&id_medium, UPLOAD_LINK_TIMEOUT_SEC, None)?;
-            let small = bucket.presign_put(&id_small, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+            let original =
+                bucket.presign_put(&object_name_original, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+            let medium = bucket.presign_put(&object_name_medium, UPLOAD_LINK_TIMEOUT_SEC, None)?;
+            let small = bucket.presign_put(&object_name_small, UPLOAD_LINK_TIMEOUT_SEC, None)?;
 
             drop(bucket);
 
@@ -177,7 +181,9 @@ pub async fn get_images(
         ",
     )?;
 
-    let files = stmt.query_map([user.id], |row| Ok(row.get::<usize, usize>(0)?.to_string()))?;
+    let files = stmt.query_map([user.id], |row| {
+        Ok(row.get::<usize, String>(0)?.to_string())
+    })?;
 
     let files = files.collect::<Result<Vec<_>, _>>()?;
 
@@ -212,7 +218,7 @@ pub async fn get_image(
 
     let mut stmt = connection.prepare(
         "
-            SELECT variant.filename
+            SELECT variant.object_name
             FROM variant INNER JOIN image ON variant.image_id = image.id
             WHERE image.user_id = ?1 AND image.id = ?2 AND variant.quality = ?3;
         ",
@@ -230,8 +236,9 @@ pub async fn get_image(
     let file: Option<Result<String, _>> = files.next();
 
     match file {
-        Some(Ok(name)) => {
-            let url = bucket.presign_get(format!("/{}", name), UPLOAD_LINK_TIMEOUT_SEC, None)?;
+        Some(Ok(object_name)) => {
+            let url =
+                bucket.presign_get(format!("/{}", object_name), UPLOAD_LINK_TIMEOUT_SEC, None)?;
 
             return Ok(Redirect::temporary(&url));
         }

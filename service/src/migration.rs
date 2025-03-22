@@ -22,7 +22,7 @@ pub fn apply_migrations(connection: &mut Connection) {
         ),
         M::up(
             "CREATE TABLE image (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                id TEXT PRIMARY KEY, 
                 filename TEXT NOT NULL,
                 metadata TEXT,
                 user_id INTEGER NOT NULL,
@@ -33,12 +33,12 @@ pub fn apply_migrations(connection: &mut Connection) {
         M::up(
             "CREATE TABLE variant (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                filename TEXT NOT NULL,
+                object_name TEXT NOT NULL,
                 width INTEGER NOT NULL,
                 height INTEGER NOT NULL,
                 compression_quality INTEGER NOT NULL,
                 quality TEXT NOT NULL, 
-                image_id INTEGER NOT NULL,
+                image_id TEXT NOT NULL,
                 FOREIGN KEY (image_id)
                     REFERENCES image (id) 
             );",
@@ -56,7 +56,7 @@ pub fn apply_migrations(connection: &mut Connection) {
         M::up(
             "CREATE TABLE image_tag (
                 tag_id INTEGER NOT NULL,
-                image_id INTEGER NOT NULL,
+                image_id TEXT NOT NULL,
                 FOREIGN KEY (tag_id)
                     REFERENCES tag (id),
                 FOREIGN KEY (image_id)
