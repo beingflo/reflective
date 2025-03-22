@@ -19,21 +19,25 @@ const View: Component = () => {
 
   const goToNextImage = () => {
     if (!openImage()) return;
-    const currentIndex = state.images.indexOf(openImage());
+    const currentIndex = state.images.findIndex(
+      (image) => image.id === openImage(),
+    );
     const nextImage = state.images[currentIndex + 1];
 
     if (nextImage) {
-      setOpenImage(nextImage);
+      setOpenImage(nextImage?.id);
     }
   };
 
   const goToLastImage = () => {
     if (!openImage()) return;
-    const currentIndex = state.images.indexOf(openImage());
+    const currentIndex = state.images.findIndex(
+      (image) => image.id === openImage(),
+    );
     const lastImage = state.images[currentIndex - 1];
 
     if (lastImage) {
-      setOpenImage(lastImage);
+      setOpenImage(lastImage?.id);
     }
   };
 
@@ -77,29 +81,33 @@ const View: Component = () => {
     setImages(data);
   });
 
-  const openLightbox = (image: string) => {
-    setOpenImage(image);
+  const openLightbox = (imageId: string) => {
+    setOpenImage(imageId);
   };
 
   const leftImages = () => state.images.filter((_, idx) => idx % 3 === 0);
   const middleImages = () => state.images.filter((_, idx) => idx % 3 === 1);
   const rightImages = () => state.images.filter((_, idx) => idx % 3 === 2);
 
+  createEffect(() => {
+    console.log(openImage());
+  });
+
   return (
     <div>
       <Show when={openImage()}>
         <Lightbox imageId={openImage()} />
       </Show>
-      <div class="flex flex-row gap-4 px-8 max-w-screen-2xl mx-auto">
+      <div class="flex flex-row gap-4 p-8 max-w-screen-2xl mx-auto">
         <div class="flex flex-col gap-4 w-1/3">
           <For each={leftImages()}>
             {(image) => (
               <img
                 class="object-fill w-full min-h-24"
-                id={image}
+                id={image?.id}
                 loading="lazy"
-                onClick={() => openLightbox(image)}
-                src={`/api/images/${image}?quality=small`}
+                onClick={() => openLightbox(image?.id)}
+                src={`/api/images/${image?.id}?quality=small`}
               />
             )}
           </For>
@@ -109,10 +117,10 @@ const View: Component = () => {
             {(image) => (
               <img
                 class="object-fill w-full min-h-24"
-                id={image}
+                id={image?.id}
                 loading="lazy"
-                onClick={() => openLightbox(image)}
-                src={`/api/images/${image}?quality=small`}
+                onClick={() => openLightbox(image?.id)}
+                src={`/api/images/${image?.id}?quality=small`}
               />
             )}
           </For>
@@ -122,10 +130,10 @@ const View: Component = () => {
             {(image) => (
               <img
                 class="object-fill w-full min-h-24"
-                id={image}
+                id={image?.id}
                 loading="lazy"
-                onClick={() => openLightbox(image)}
-                src={`/api/images/${image}?quality=small`}
+                onClick={() => openLightbox(image?.id)}
+                src={`/api/images/${image?.id}?quality=small`}
               />
             )}
           </For>

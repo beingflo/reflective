@@ -16,7 +16,7 @@ use image::{GenericImageView, ImageDecoder, ImageReader};
 use jiff::{Timestamp, fmt::strtime, tz};
 use reqwest::Client;
 use rusqlite::{Connection, params};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
@@ -227,28 +227,38 @@ pub async fn upload_image(
     Ok(StatusCode::OK)
 }
 
+#[derive(Serialize)]
+pub struct Image {
+    id: String,
+    captured_at: String,
+}
+
 #[tracing::instrument(skip_all, fields(
     username = %user.username,
 ))]
 pub async fn get_images(
     user: AuthenticatedUser,
     State(state): State<AppState>,
-) -> Result<(StatusCode, Json<Vec<String>>), AppError> {
+) -> Result<(StatusCode, Json<Vec<Image>>), AppError> {
     let connection = state.conn.lock().await;
 
     let mut stmt = connection.prepare(
         "
-            SELECT id 
+            SELECT id, captured_at
             FROM image
             WHERE user_id = ?1;
         ",
     )?;
 
     let files = stmt.query_map([user.id], |row| {
-        Ok(row.get::<usize, String>(0)?.to_string())
+        Ok(Image {
+            id: row.get::<usize, String>(0)?.to_string(),
+            captured_at: row.get(1)?,
+        })
     })?;
 
-    let files = files.collect::<Result<Vec<_>, _>>()?;
+    let mut files = files.collect::<Result<Vec<_>, _>>()?;
+    files.sort_by(|a, b| b.captured_at.cmp(&a.captured_at));
 
     info!(message = "load image list", number_of_files = files.len());
 

@@ -7,7 +7,6 @@ export type LightboxProps = {
 };
 
 const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
-  const navigate = useNavigate();
   const [state, { setImages }] = useStore();
 
   // Fetch images in case of reload
@@ -29,10 +28,10 @@ const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
     const lastImage = state.images[currentIndex - 1];
 
     if (nextImage) {
-      new Image().src = `/api/images/${nextImage}?quality=medium`;
+      new Image().src = `/api/images/${nextImage?.id}?quality=medium`;
     }
     if (lastImage) {
-      new Image().src = `/api/images/${lastImage}?quality=medium`;
+      new Image().src = `/api/images/${lastImage?.id}?quality=medium`;
     }
   });
 
