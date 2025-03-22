@@ -1,4 +1,4 @@
-use std::{io::Cursor, sync::Arc};
+use std::{collections::HashMap, io::Cursor, sync::Arc};
 
 use crate::{
     auth::AuthenticatedUser,
@@ -12,7 +12,7 @@ use axum::{
     response::Redirect,
 };
 use futures::join;
-use image::{GenericImageView, ImageReader};
+use image::{GenericImageView, ImageDecoder, ImageReader};
 use reqwest::Client;
 use rusqlite::{Connection, params};
 use serde::Deserialize;
@@ -26,6 +26,7 @@ const UPLOAD_LINK_TIMEOUT_SEC: u32 = 600;
 #[tracing::instrument(skip_all, fields(
     username = %user.username,
 ))]
+#[axum::debug_handler]
 pub async fn upload_image(
     user: AuthenticatedUser,
     State(state): State<AppState>,
@@ -56,6 +57,20 @@ pub async fn upload_image(
     };
 
     let image = ImageReader::new(Cursor::new(&image_data)).with_guessed_format()?;
+    let mut exif_map = HashMap::new();
+    let exif = ImageReader::new(Cursor::new(&image_data))
+        .with_guessed_format()?
+        .into_decoder()?
+        .exif_metadata()?;
+
+    if let Some(exif) = exif {
+        let exif_reader = exif::Reader::new();
+        let exif = exif_reader.read_raw(exif)?;
+
+        for f in exif.fields() {
+            exif_map.insert(f.tag.to_string(), f.display_value().to_string());
+        }
+    }
 
     {
         let connection = state.conn.lock().await;
@@ -76,10 +91,15 @@ pub async fn upload_image(
         let new_id = get_id();
 
         let mut stmt = connection.prepare(
-            "INSERT INTO image (id, filename, user_id) VALUES (?1, ?2, ?3) RETURNING id",
+            "INSERT INTO image (id, filename, metadata, user_id) VALUES (?1, ?2, ?3, ?4) RETURNING id",
         )?;
 
-        let mut result = stmt.query(params![new_id, filename, user.id])?;
+        let mut result = stmt.query(params![
+            new_id,
+            filename,
+            serde_json::to_string(&exif_map)?,
+            user.id
+        ])?;
         match result.next()? {
             Some(row) => {
                 image_id = row.get(0)?;
@@ -213,7 +233,6 @@ pub struct QueryParams {
     id = %id,
     quality = %params.quality
 ))]
-#[axum::debug_handler]
 pub async fn get_image(
     user: AuthenticatedUser,
     Path(id): Path<String>,

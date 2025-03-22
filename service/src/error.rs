@@ -24,6 +24,8 @@ pub enum AppError {
     ImageError(#[from] image::ImageError),
     #[error("IO error {0}")]
     IOError(#[from] io::Error),
+    #[error("Exif error {0}")]
+    ExifError(#[from] exif::Error),
 }
 
 impl IntoResponse for AppError {
@@ -48,6 +50,9 @@ impl IntoResponse for AppError {
                 (StatusCode::BAD_REQUEST, error.to_string()).into_response()
             }
             AppError::IOError(error) => {
+                (StatusCode::BAD_REQUEST, error.to_string()).into_response()
+            }
+            AppError::ExifError(error) => {
                 (StatusCode::BAD_REQUEST, error.to_string()).into_response()
             }
         }

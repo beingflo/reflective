@@ -24,6 +24,7 @@ pub fn apply_migrations(connection: &mut Connection) {
             "CREATE TABLE image (
                 id TEXT PRIMARY KEY, 
                 filename TEXT NOT NULL,
+                captured_at TEXT NOT NULL,
                 metadata TEXT,
                 user_id INTEGER NOT NULL,
                 FOREIGN KEY (user_id)
