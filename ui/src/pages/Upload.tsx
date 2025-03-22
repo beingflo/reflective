@@ -57,7 +57,9 @@ const Upload: Component = () => {
     async (image: File) => {
       setImageStates((prev) => ({ ...prev, [image.name]: 'uploading' }));
       const formData = new FormData();
-      formData.append(image.name, image);
+      formData.append('filename', image.name);
+      formData.append('data', image);
+      formData.append('last_modified', image.lastModified.toString());
 
       const response = await fetch('/api/images/upload', {
         body: formData,

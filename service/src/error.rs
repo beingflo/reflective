@@ -1,6 +1,7 @@
 use std::io;
 
 use axum::{
+    extract::multipart::MultipartError,
     http::StatusCode,
     response::{IntoResponse, Response},
 };
@@ -26,6 +27,8 @@ pub enum AppError {
     IOError(#[from] io::Error),
     #[error("Exif error {0}")]
     ExifError(#[from] exif::Error),
+    #[error("Multipart error {0}")]
+    MultipartError(#[from] MultipartError),
 }
 
 impl IntoResponse for AppError {
@@ -53,6 +56,9 @@ impl IntoResponse for AppError {
                 (StatusCode::BAD_REQUEST, error.to_string()).into_response()
             }
             AppError::ExifError(error) => {
+                (StatusCode::BAD_REQUEST, error.to_string()).into_response()
+            }
+            AppError::MultipartError(error) => {
                 (StatusCode::BAD_REQUEST, error.to_string()).into_response()
             }
         }

@@ -13,6 +13,7 @@ use axum::{
 };
 use futures::join;
 use image::{GenericImageView, ImageDecoder, ImageReader};
+use jiff::Timestamp;
 use reqwest::Client;
 use rusqlite::{Connection, params};
 use serde::Deserialize;
@@ -32,29 +33,44 @@ pub async fn upload_image(
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<StatusCode, AppError> {
-    let Ok(field) = multipart.next_field().await else {
-        // Multipart parsing error
-        return Err(AppError::Status(StatusCode::BAD_REQUEST));
-    };
+    let mut filename: Option<String> = None;
+    let mut last_modified: Option<String> = None;
+    let mut image_data: Option<Vec<u8>> = None;
 
-    let Some(field) = field else {
-        error!(message = "no field in multipart body");
-        return Err(AppError::Status(StatusCode::BAD_REQUEST));
-    };
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        match field.name() {
+            Some("filename") => {
+                filename = Some(field.text().await?);
+            }
+            Some("last_modified") => {
+                last_modified = Some(field.text().await?);
+            }
+            _ => {
+                let data = field.bytes().await?;
 
-    let Some(filename): Option<String> = field.name().map(|n| n.into()) else {
-        error!(message = "no filename in multipart body");
+                image_data = Some(data.to_vec());
+            }
+        }
+    }
+
+    if filename.is_none() || last_modified.is_none() || image_data.is_none() {
+        error!(message = "missing field in multipart body");
         return Err(AppError::Status(StatusCode::BAD_REQUEST));
+    }
+
+    let Some(filename) = filename else {
+        unreachable!()
+    };
+    let Some(last_modified) = last_modified else {
+        unreachable!()
+    };
+    let Some(image_data) = image_data else {
+        unreachable!()
     };
 
     let image_id: String;
 
     info!(message = "uploading image", filename);
-
-    let Ok(image_data) = field.bytes().await else {
-        error!(message = "no content in multipart body");
-        return Err(AppError::Status(StatusCode::BAD_REQUEST));
-    };
 
     let image = ImageReader::new(Cursor::new(&image_data)).with_guessed_format()?;
     let mut exif_map = HashMap::new();
@@ -76,10 +92,10 @@ pub async fn upload_image(
         let connection = state.conn.lock().await;
         let mut stmt = connection.prepare(
             "
-                    SELECT filename 
-                    FROM image
-                    WHERE user_id = ?1 AND filename = ?2
-                ",
+                SELECT filename 
+                FROM image
+                WHERE user_id = ?1 AND filename = ?2
+            ",
         )?;
 
         let mut result = stmt.query(params![user.id, filename])?;
@@ -89,6 +105,17 @@ pub async fn upload_image(
         };
 
         let new_id = get_id();
+        let captured_at = exif_map.get("DateTimeOriginal").unwrap_or(&last_modified);
+        info!(message = "captured_at", captured_at = captured_at);
+        let captured_at = captured_at.parse().unwrap_or_else(|_| {
+            // todo fix this parsing
+            warn!(message = "failed to parse DateTimeOriginal or last_modified");
+            Timestamp::now()
+        });
+        info!(
+            message = "captured_at",
+            captured_at = captured_at.to_string()
+        );
 
         let mut stmt = connection.prepare(
             "INSERT INTO image (id, filename, metadata, user_id) VALUES (?1, ?2, ?3, ?4) RETURNING id",
