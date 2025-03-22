@@ -8,9 +8,9 @@ use std::sync::Arc;
 
 use auth::{login, signup};
 use axum::{
+    Router,
     extract::DefaultBodyLimit,
     routing::{get, post},
-    Router,
 };
 use dotenv::dotenv;
 use image::{get_image, get_images, upload_image};
@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/auth/login", post(login))
         .route("/api/images/upload", post(upload_image))
         .route("/api/images", get(get_images))
-        .route("/api/images/:id", get(get_image))
+        .route("/api/images/{id}", get(get_image))
         .with_state(AppState {
             conn: Arc::new(Mutex::new(conn)),
             bucket: Arc::new(Mutex::new(bucket)),

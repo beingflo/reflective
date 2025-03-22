@@ -1,11 +1,10 @@
 use crate::{error::AppError, utils::get_auth_token};
 use axum::{
-    async_trait,
-    extract::{FromRequestParts, State},
-    http::{request::Parts, StatusCode},
     Json,
+    extract::{FromRequestParts, State},
+    http::{StatusCode, request::Parts},
 };
-use axum_extra::extract::{cookie::Cookie, CookieJar};
+use axum_extra::extract::{CookieJar, cookie::Cookie};
 use bcrypt::{hash, verify};
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
@@ -31,7 +30,6 @@ pub struct AuthenticatedUser {
     pub username: String,
 }
 
-#[async_trait]
 impl FromRequestParts<AppState> for AuthenticatedUser {
     type Rejection = AppError;
 
