@@ -57,7 +57,7 @@ pub fn apply_migrations(connection: &mut Connection) {
             "CREATE TABLE image_tag (
                 tag_id INTEGER NOT NULL,
                 image_id TEXT NOT NULL,
-                FOREIGN KEY (tag_id)
+                FOREIGN KEY (tag_id
                     REFERENCES tag (id),
                 FOREIGN KEY (image_id)
                     REFERENCES image (id) 

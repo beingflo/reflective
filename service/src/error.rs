@@ -1,3 +1,5 @@
+use std::io;
+
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -20,6 +22,8 @@ pub enum AppError {
     CredentialsError(#[from] s3::creds::error::CredentialsError),
     #[error("Image error {0}")]
     ImageError(#[from] image::ImageError),
+    #[error("IO error {0}")]
+    IOError(#[from] io::Error),
 }
 
 impl IntoResponse for AppError {
@@ -41,6 +45,9 @@ impl IntoResponse for AppError {
                 (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
             }
             AppError::ImageError(error) => {
+                (StatusCode::BAD_REQUEST, error.to_string()).into_response()
+            }
+            AppError::IOError(error) => {
                 (StatusCode::BAD_REQUEST, error.to_string()).into_response()
             }
         }

@@ -58,7 +58,11 @@ pub fn get_bucket() -> Result<Bucket, AppError> {
     Ok(Bucket::new(&bucket_name, region, credentials)?)
 }
 
-pub fn compress_image(original: &DynamicImage, dimensions: (u32, u32), quality: u8) -> Vec<u8> {
+pub fn compress_image(
+    original: &DynamicImage,
+    dimensions: (u32, u32),
+    quality: u8,
+) -> Result<Vec<u8>, AppError> {
     let image = original.resize(
         dimensions.0,
         dimensions.1,
@@ -70,7 +74,7 @@ pub fn compress_image(original: &DynamicImage, dimensions: (u32, u32), quality: 
     let write = Cursor::new(&mut bytes);
 
     let encoder = JpegEncoder::new_with_quality(write, quality);
-    image.write_with_encoder(encoder).unwrap();
+    image.write_with_encoder(encoder)?;
 
-    bytes
+    Ok(bytes)
 }
