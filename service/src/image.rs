@@ -13,7 +13,7 @@ use axum::{
 };
 use futures::join;
 use image::{GenericImageView, ImageDecoder, ImageReader};
-use jiff::Timestamp;
+use jiff::{Timestamp, fmt::strtime, tz};
 use reqwest::Client;
 use rusqlite::{Connection, params};
 use serde::Deserialize;
@@ -37,7 +37,7 @@ pub async fn upload_image(
     let mut last_modified: Option<String> = None;
     let mut image_data: Option<Vec<u8>> = None;
 
-    while let Some(field) = multipart.next_field().await.unwrap() {
+    while let Some(field) = multipart.next_field().await? {
         match field.name() {
             Some("filename") => {
                 filename = Some(field.text().await?);
@@ -105,25 +105,30 @@ pub async fn upload_image(
         };
 
         let new_id = get_id();
-        let captured_at = exif_map.get("DateTimeOriginal").unwrap_or(&last_modified);
-        info!(message = "captured_at", captured_at = captured_at);
-        let captured_at = captured_at.parse().unwrap_or_else(|_| {
-            // todo fix this parsing
-            warn!(message = "failed to parse DateTimeOriginal or last_modified");
-            Timestamp::now()
-        });
-        info!(
-            message = "captured_at",
-            captured_at = captured_at.to_string()
-        );
+
+        let timestamp;
+
+        if let Some(captured_at) = exif_map.get("DateTimeOriginal") {
+            let mut captured_at = strtime::parse("%Y-%m-%d %H:%M:%S", captured_at)?;
+            captured_at.set_offset(Some(tz::offset(0)));
+            timestamp = captured_at.to_timestamp()?.to_string();
+        } else {
+            timestamp = Timestamp::from_millisecond(
+                last_modified
+                    .parse()
+                    .unwrap_or(Timestamp::now().as_millisecond()),
+            )?
+            .to_string();
+        }
 
         let mut stmt = connection.prepare(
-            "INSERT INTO image (id, filename, metadata, user_id) VALUES (?1, ?2, ?3, ?4) RETURNING id",
+            "INSERT INTO image (id, filename, captured_at, metadata, user_id) VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id",
         )?;
 
         let mut result = stmt.query(params![
             new_id,
             filename,
+            timestamp,
             serde_json::to_string(&exif_map)?,
             user.id
         ])?;

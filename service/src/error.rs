@@ -29,6 +29,8 @@ pub enum AppError {
     ExifError(#[from] exif::Error),
     #[error("Multipart error {0}")]
     MultipartError(#[from] MultipartError),
+    #[error("DateParseError error {0}")]
+    DateParseError(#[from] jiff::Error),
 }
 
 impl IntoResponse for AppError {
@@ -59,6 +61,9 @@ impl IntoResponse for AppError {
                 (StatusCode::BAD_REQUEST, error.to_string()).into_response()
             }
             AppError::MultipartError(error) => {
+                (StatusCode::BAD_REQUEST, error.to_string()).into_response()
+            }
+            AppError::DateParseError(error) => {
                 (StatusCode::BAD_REQUEST, error.to_string()).into_response()
             }
         }
