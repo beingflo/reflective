@@ -170,16 +170,16 @@ pub async fn upload_image(
         let connection = state.conn.lock().await;
 
         connection.execute(
-                "INSERT INTO variant (object_name, width, height, compression_quality, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                (&object_name_original, dimensions.0, dimensions.1, original_quality, "original", &image_id),
+                "INSERT INTO variant (object_name, width, height, compression_quality, quality, version, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                (&object_name_original, dimensions.0, dimensions.1, original_quality, "original", 1, &image_id),
             )?;
         connection.execute(
-                "INSERT INTO variant (object_name, width, height, compression_quality, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                (&object_name_medium, medium_dimension.0, medium_dimension.1, medium_quality, "medium", &image_id),
+                "INSERT INTO variant (object_name, width, height, compression_quality, quality, version, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                (&object_name_medium, medium_dimension.0, medium_dimension.1, medium_quality, "medium", 1, &image_id),
             )?;
         connection.execute(
-                "INSERT INTO variant (object_name, width, height, compression_quality, quality, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                (&object_name_small, small_dimension.0, small_dimension.1, small_quality, "small", &image_id),
+                "INSERT INTO variant (object_name, width, height, compression_quality, quality, version, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                (&object_name_small, small_dimension.0, small_dimension.1, small_quality, "small", 1, &image_id),
             )?;
     }
 

@@ -39,6 +39,7 @@ pub fn apply_migrations(connection: &mut Connection) {
                 height INTEGER NOT NULL,
                 compression_quality INTEGER NOT NULL,
                 quality TEXT NOT NULL, 
+                version INTEGER NOT NULL,
                 image_id TEXT NOT NULL,
                 FOREIGN KEY (image_id)
                     REFERENCES image (id) 
