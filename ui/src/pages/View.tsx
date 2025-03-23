@@ -89,10 +89,6 @@ const View: Component = () => {
   const middleImages = () => state.images.filter((_, idx) => idx % 3 === 1);
   const rightImages = () => state.images.filter((_, idx) => idx % 3 === 2);
 
-  createEffect(() => {
-    console.log(openImage());
-  });
-
   return (
     <div>
       <Show when={openImage()}>
