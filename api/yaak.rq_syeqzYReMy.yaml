@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_syeqzYReMy
 createdAt: 2025-02-22T13:00:17.478298
-updatedAt: 2025-02-22T23:04:50.589677
+updatedAt: 2025-03-23T15:30:08.730907
 workspaceId: wk_2iqsX2rPhP
 folderId: fl_NF56fseXRY
 authentication: {}
@@ -10,11 +10,19 @@ authenticationType: null
 body:
   form:
   - enabled: true
-    file: /Users/florian/Images/2023/Japan/DSCF2225.jpg
+    file: /Users/florian/Images/2025/Zoo/DSCF9996.jpg
     id: pYvCBcY4ye
-    name: '12234'
+    name: data
   - enabled: true
-    id: D7FIBbPz0m
+    id: ez06z4xnUN
+    name: last_modified
+    value: '1234'
+  - enabled: true
+    id: YVYYpXMJPe
+    name: filename
+    value: DSCF9996.jpg
+  - enabled: true
+    id: uXNySQzUwg
     name: ''
     value: ''
 bodyType: multipart/form-data
@@ -27,5 +35,5 @@ headers:
 method: POST
 name: upload
 sortPriority: 0.0
-url: ${[ BASE_URL ]}/images/upload
+url: ${[ BASE_URL ]}/images
 urlParameters: []

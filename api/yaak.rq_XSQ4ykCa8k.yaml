@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_XSQ4ykCa8k
 createdAt: 2025-02-22T13:02:24.640728
-updatedAt: 2025-02-22T13:02:40.082182
+updatedAt: 2025-03-23T15:30:08.731145
 workspaceId: wk_2iqsX2rPhP
 folderId: fl_NF56fseXRY
 authentication: {}
@@ -22,6 +22,6 @@ description: ''
 headers: []
 method: GET
 name: list
-sortPriority: 0.001
+sortPriority: 1000.0
 url: ${[ BASE_URL ]}/images
 urlParameters: []

@@ -1,17 +1,17 @@
 type: http_request
 model: http_request
-id: rq_cmxQ99G34Z
-createdAt: 2025-02-22T12:59:32.712730
-updatedAt: 2025-03-23T15:27:14.943832
+id: rq_SPGZ9o2QKd
+createdAt: 2025-03-23T15:30:27.698559
+updatedAt: 2025-03-23T15:31:43.794066
 workspaceId: wk_2iqsX2rPhP
-folderId: fl_2xEN7557Ew
+folderId: fl_ZHvLbpeeKZ
 authentication: {}
 authenticationType: null
 body:
   text: |-
     {
-      "username": "user",
-      "password": "test"
+      "image_ids": ["1","2","3"],
+      "tags": [""]
     }
 bodyType: application/json
 description: ''
@@ -19,9 +19,9 @@ headers:
 - enabled: true
   name: Content-Type
   value: application/json
-  id: UsuSpBFRQ8
-method: POST
-name: login
-sortPriority: 1000.0
-url: ${[ BASE_URL ]}/auth/login
+  id: E5cmyuXHB5
+method: DELETE
+name: remove
+sortPriority: 1999.9998
+url: ${[ BASE_URL ]}/tags
 urlParameters: []

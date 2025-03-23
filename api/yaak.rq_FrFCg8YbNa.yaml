@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_FrFCg8YbNa
 createdAt: 2025-02-22T13:03:17.459554
-updatedAt: 2025-02-22T23:05:17.585686
+updatedAt: 2025-03-23T15:30:08.731362
 workspaceId: wk_2iqsX2rPhP
 folderId: fl_NF56fseXRY
 authentication: {}
@@ -22,6 +22,6 @@ description: ''
 headers: []
 method: GET
 name: download
-sortPriority: 0.002
-url: ${[ BASE_URL ]}/images/12234?quality=small
+sortPriority: 2000.0
+url: ${[ BASE_URL ]}/images/1y7BTvK0AGWI4za8?quality=small
 urlParameters: []
