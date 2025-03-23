@@ -34,8 +34,8 @@ pub async fn upload_image(
     mut multipart: Multipart,
 ) -> Result<StatusCode, AppError> {
     let mut filename: Option<String> = None;
-    let mut last_modified: Option<String> = None;
     let mut image_data: Option<Vec<u8>> = None;
+    let mut last_modified: Option<String> = None;
 
     while let Some(field) = multipart.next_field().await? {
         match field.name() {
@@ -45,10 +45,17 @@ pub async fn upload_image(
             Some("last_modified") => {
                 last_modified = Some(field.text().await?);
             }
-            _ => {
+            Some("data") => {
                 let data = field.bytes().await?;
-
                 image_data = Some(data.to_vec());
+            }
+            Some(name) => {
+                error!(message = "unknown field in multipart body", name);
+                return Err(AppError::Status(StatusCode::BAD_REQUEST));
+            }
+            _ => {
+                error!(message = "field in multipart body with no name");
+                return Err(AppError::Status(StatusCode::BAD_REQUEST));
             }
         }
     }
