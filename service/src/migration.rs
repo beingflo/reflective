@@ -48,8 +48,7 @@ pub fn apply_migrations(connection: &mut Connection) {
         M::up(
             "CREATE TABLE tag (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                description TEXT NOT NULL,
-                metadata TEXT,
+                description TEXT NOT NULL UNIQUE,
                 user_id INTEGER NOT NULL,
                 FOREIGN KEY (user_id)
                     REFERENCES user (id) 
