@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/api/auth/signup", post(signup))
         .route("/api/auth/login", post(login))
-        .route("/api/images/upload", post(upload_image))
+        .route("/api/images", post(upload_image))
         .route("/api/images", get(get_images))
         .route("/api/images/{id}", get(get_image))
         .with_state(AppState {

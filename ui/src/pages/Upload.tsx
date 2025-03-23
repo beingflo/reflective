@@ -61,7 +61,7 @@ const Upload: Component = () => {
       formData.append('data', image);
       formData.append('last_modified', image.lastModified.toString());
 
-      const response = await fetch('/api/images/upload', {
+      const response = await fetch('/api/images', {
         body: formData,
         method: 'POST',
       }).catch((error) => {
