@@ -12,7 +12,7 @@ CREATE TABLE variant (
     width INTEGER NOT NULL,
     height INTEGER NOT NULL,
     compression_quality INTEGER NOT NULL,
-    quality INTEGER NOT NULL, 
+    quality TEXT NOT NULL, 
     version INTEGER NOT NULL,
     image_id TEXT references image(id)
 );

@@ -1,5 +1,6 @@
 mod auth;
 mod error;
+mod image;
 mod utils;
 
 use std::sync::Arc;
@@ -8,9 +9,10 @@ use auth::{login, signup};
 use axum::{
     Router,
     extract::DefaultBodyLimit,
-    routing::{delete, get, post},
+    routing::{get, post},
 };
 use dotenv::dotenv;
+use image::{get_image, get_images, upload_image};
 use s3::Bucket;
 use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
 use tokio::sync::Mutex;
@@ -46,9 +48,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/api/auth/signup", post(signup))
         .route("/api/auth/login", post(login))
-        //.route("/api/images", post(upload_image))
-        //.route("/api/images", get(get_images))
-        //.route("/api/images/{id}", get(get_image))
+        .route("/api/images", post(upload_image))
+        .route("/api/images", get(get_images))
+        .route("/api/images/{id}", get(get_image))
         //.route("/api/tags", post(add_tags))
         //.route("/api/tags", delete(remove_tags))
         .with_state(AppState {

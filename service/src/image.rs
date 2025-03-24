@@ -1,7 +1,7 @@
-use std::{collections::HashMap, io::Cursor, sync::Arc};
+use std::{collections::HashMap, io::Cursor};
 
 use crate::{
-    auth::AuthenticatedUser,
+    auth::AuthenticatedAccount,
     error::AppError,
     utils::{compress_image, get_id, get_object_name},
 };
@@ -15,21 +15,20 @@ use futures::join;
 use image::{GenericImageView, ImageDecoder, ImageReader};
 use jiff::{Timestamp, fmt::strtime, tz};
 use reqwest::Client;
-use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
-use tracing::{error, info, warn};
+use sqlx::{FromRow, Pool, Postgres, query, query_as};
+use tracing::{error, info, trace, warn};
 
 use crate::AppState;
 
 const UPLOAD_LINK_TIMEOUT_SEC: u32 = 600;
 
 #[tracing::instrument(skip_all, fields(
-    username = %user.username,
+    username = %account.username,
 ))]
 #[axum::debug_handler]
 pub async fn upload_image(
-    user: AuthenticatedUser,
+    account: AuthenticatedAccount,
     State(state): State<AppState>,
     mut multipart: Multipart,
 ) -> Result<StatusCode, AppError> {
@@ -75,8 +74,6 @@ pub async fn upload_image(
         unreachable!()
     };
 
-    let image_id: String;
-
     info!(message = "uploading image", filename);
 
     let image = ImageReader::new(Cursor::new(&image_data)).with_guessed_format()?;
@@ -95,60 +92,54 @@ pub async fn upload_image(
         }
     }
 
-    {
-        let connection = state.conn.lock().await;
-        let mut stmt = connection.prepare(
-            "
-                SELECT filename 
-                FROM image
-                WHERE user_id = ?1 AND filename = ?2
-            ",
-        )?;
-
-        let mut result = stmt.query(params![user.id, filename])?;
-        if let Some(_) = result.next()? {
-            error!(message = "image already exists");
-            return Err(AppError::Status(StatusCode::CONFLICT));
-        };
-
-        let new_id = get_id();
-
-        let timestamp;
-
-        if let Some(captured_at) = exif_map.get("DateTimeOriginal") {
-            let mut captured_at = strtime::parse("%Y-%m-%d %H:%M:%S", captured_at)?;
-            captured_at.set_offset(Some(tz::offset(0)));
-            timestamp = captured_at.to_timestamp()?.to_string();
-        } else {
-            timestamp = Timestamp::from_millisecond(
-                last_modified
-                    .parse()
-                    .unwrap_or(Timestamp::now().as_millisecond()),
-            )?
-            .to_string();
-        }
-
-        let mut stmt = connection.prepare(
-            "INSERT INTO image (id, filename, captured_at, metadata, user_id) VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id",
-        )?;
-
-        let mut result = stmt.query(params![
-            new_id,
-            filename,
-            timestamp,
-            serde_json::to_string(&exif_map)?,
-            user.id
-        ])?;
-        match result.next()? {
-            Some(row) => {
-                image_id = row.get(0)?;
-            }
-            None => {
-                error!(message = "failed to insert image");
-                return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR));
-            }
-        }
+    #[derive(FromRow)]
+    struct File {
+        filename: String,
     }
+
+    let result = query_as!(
+        File,
+        "
+            SELECT filename 
+            FROM image
+            WHERE account_id = $1 AND filename = $2;
+        ",
+        account.id,
+        filename
+    )
+    .fetch_optional(&state.pool)
+    .await?;
+
+    if let Some(file) = result {
+        error!(message = "image already exists", file = %file.filename);
+        return Err(AppError::Status(StatusCode::CONFLICT));
+    };
+
+    let image_id = get_id();
+
+    let timestamp;
+
+    if let Some(captured_at) = exif_map.get("DateTimeOriginal") {
+        let mut captured_at = strtime::parse("%Y-%m-%d %H:%M:%S", captured_at)?;
+        captured_at.set_offset(Some(tz::offset(0)));
+        timestamp = captured_at.to_timestamp()?.to_string();
+    } else {
+        timestamp = Timestamp::from_millisecond(
+            last_modified
+                .parse()
+                .unwrap_or(Timestamp::now().as_millisecond()),
+        )?
+        .to_string();
+    }
+
+    query!(
+        "INSERT INTO image (id, filename, captured_at, metadata, account_id) VALUES ($1, $2, $3, $4, $5);",
+        image_id,
+        filename,
+        timestamp,
+        serde_json::to_string(&exif_map)?,
+        account.id
+    ).execute(&state.pool).await?;
 
     let original_image = image.decode()?;
 
@@ -173,22 +164,18 @@ pub async fn upload_image(
     let object_name_medium = get_object_name();
     let object_name_small = get_object_name();
 
-    {
-        let connection = state.conn.lock().await;
-
-        connection.execute(
-                "INSERT INTO variant (object_name, width, height, compression_quality, quality, version, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                (&object_name_original, dimensions.0, dimensions.1, original_quality, "original", 1, &image_id),
-            )?;
-        connection.execute(
-                "INSERT INTO variant (object_name, width, height, compression_quality, quality, version, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                (&object_name_medium, medium_dimension.0, medium_dimension.1, medium_quality, "medium", 1, &image_id),
-            )?;
-        connection.execute(
-                "INSERT INTO variant (object_name, width, height, compression_quality, quality, version, image_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-                (&object_name_small, small_dimension.0, small_dimension.1, small_quality, "small", 1, &image_id),
-            )?;
-    }
+    query!(
+        "INSERT INTO variant (object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        &object_name_original, dimensions.0 as i32, dimensions.1 as i32, original_quality, "original", 1 as i64, &image_id
+    ).execute(&state.pool).await?;
+    query!(
+        "INSERT INTO variant (object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        &object_name_medium, medium_dimension.0 as i32, medium_dimension.1 as i32, medium_quality as i32, "medium", 1 as i64, &image_id
+    ).execute(&state.pool).await?;
+    query!(
+        "INSERT INTO variant (object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        &object_name_small, small_dimension.0 as i32, small_dimension.1 as i32, small_quality as i32, "small", 1 as i64, &image_id
+    ).execute(&state.pool).await?;
 
     let [original_url, medium_url, small_url] = {
         let bucket = state.bucket.lock().await;
@@ -234,42 +221,36 @@ pub async fn upload_image(
     Ok(StatusCode::OK)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, FromRow)]
 pub struct Image {
     id: String,
     captured_at: String,
 }
 
 #[tracing::instrument(skip_all, fields(
-    username = %user.username,
+    username = %account.username,
 ))]
 pub async fn get_images(
-    user: AuthenticatedUser,
+    account: AuthenticatedAccount,
     State(state): State<AppState>,
 ) -> Result<(StatusCode, Json<Vec<Image>>), AppError> {
-    let connection = state.conn.lock().await;
-
-    let mut stmt = connection.prepare(
+    let mut images = query_as!(
+        Image,
         "
             SELECT id, captured_at
             FROM image
-            WHERE user_id = ?1;
+            WHERE account_id = $1;
         ",
-    )?;
+        account.id
+    )
+    .fetch_all(&state.pool)
+    .await?;
 
-    let files = stmt.query_map([user.id], |row| {
-        Ok(Image {
-            id: row.get::<usize, String>(0)?.to_string(),
-            captured_at: row.get(1)?,
-        })
-    })?;
+    images.sort_by(|a, b| b.captured_at.cmp(&a.captured_at));
 
-    let mut files = files.collect::<Result<Vec<_>, _>>()?;
-    files.sort_by(|a, b| b.captured_at.cmp(&a.captured_at));
+    info!(message = "load image list", number_of_files = images.len());
 
-    info!(message = "load image list", number_of_files = files.len());
-
-    Ok((StatusCode::OK, Json(files)))
+    Ok((StatusCode::OK, Json(images)))
 }
 
 #[derive(Deserialize, Debug)]
@@ -278,81 +259,82 @@ pub struct QueryParams {
 }
 
 #[tracing::instrument(skip_all, fields(
-    username = %user.username,
+    username = %account.username,
     id = %id,
     quality = %params.quality
 ))]
 pub async fn get_image(
-    user: AuthenticatedUser,
+    account: AuthenticatedAccount,
     Path(id): Path<String>,
     params: Query<QueryParams>,
     State(state): State<AppState>,
 ) -> Result<Redirect, AppError> {
     info!(message = "get image");
 
-    check_image_exists(state.conn.clone(), &user.id.to_string(), &id).await?;
+    check_image_exists(&state.pool, account.id, &id).await?;
 
-    let connection = state.conn.lock().await;
     let bucket = state.bucket.lock().await;
 
-    let mut stmt = connection.prepare(
+    #[derive(FromRow)]
+    struct Variant {
+        object_name: String,
+    }
+
+    let result = query_as!(
+        Variant,
         "
             SELECT variant.object_name
             FROM variant INNER JOIN image ON variant.image_id = image.id
-            WHERE image.user_id = ?1 AND image.id = ?2 AND variant.quality = ?3;
+            WHERE image.account_id = $1 AND image.id = $2 AND variant.quality = $3;
         ",
-    )?;
+        account.id,
+        id,
+        params.quality.to_string()
+    )
+    .fetch_optional(&state.pool)
+    .await?;
 
-    let mut files = stmt.query_map(
-        [
-            user.id.to_string(),
-            id.to_string(),
-            params.quality.to_string(),
-        ],
-        |row| Ok(row.get(0)?),
-    )?;
-
-    let file: Option<Result<String, _>> = files.next();
-
-    match file {
-        Some(Ok(object_name)) => {
-            let url =
-                bucket.presign_get(format!("/{}", object_name), UPLOAD_LINK_TIMEOUT_SEC, None)?;
-
-            return Ok(Redirect::temporary(&url));
-        }
-        _ => {
-            warn!(message = "image with requested quality doesn't exist");
-            return Err(AppError::Status(StatusCode::NOT_FOUND));
-        }
+    if let Some(variant) = result {
+        let url = bucket.presign_get(
+            format!("/{}", variant.object_name),
+            UPLOAD_LINK_TIMEOUT_SEC,
+            None,
+        )?;
+        return Ok(Redirect::temporary(&url));
     }
+
+    warn!(message = "image with requested quality doesn't exist");
+    return Err(AppError::Status(StatusCode::NOT_FOUND));
 }
 
 #[tracing::instrument(skip_all, fields(
-    user_id = %user_id,
+    account_id = %account_id,
     image_id = %image_id,
 ))]
 async fn check_image_exists(
-    connection: Arc<Mutex<Connection>>,
-    user_id: &str,
+    pool: &Pool<Postgres>,
+    account_id: i32,
     image_id: &str,
 ) -> Result<(), AppError> {
-    let connection = connection.lock().await;
-    let mut stmt = connection.prepare(
+    #[derive(FromRow)]
+    struct Image {
+        filename: String,
+    }
+    let result = query_as!(
+        Image,
         "
             SELECT filename
             FROM image
-            WHERE user_id = ?1 AND id = ?2
+            WHERE account_id = $1 AND id = $2;
         ",
-    )?;
+        account_id,
+        image_id
+    )
+    .fetch_optional(pool)
+    .await?;
 
-    let mut files = stmt.query_map([user_id.to_string(), image_id.to_string()], |row| {
-        Ok(row.get(0)?)
-    })?;
-
-    let file: Option<Result<String, _>> = files.next();
-
-    if let Some(_) = file {
+    if let Some(file) = result {
+        trace!(message = "image exists", file = %file.filename);
         return Ok(());
     }
 
