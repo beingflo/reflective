@@ -273,8 +273,6 @@ pub async fn get_image(
 
     check_image_exists(&state.pool, account.id, &id).await?;
 
-    let bucket = state.bucket.lock().await;
-
     #[derive(FromRow)]
     struct Variant {
         object_name: String,
@@ -293,6 +291,8 @@ pub async fn get_image(
     )
     .fetch_optional(&state.pool)
     .await?;
+
+    let bucket = state.bucket.lock().await;
 
     if let Some(variant) = result {
         let url = bucket.presign_get(
