@@ -15,14 +15,13 @@ use dotenv::dotenv;
 use image::{get_image, get_images, upload_image};
 use s3::Bucket;
 use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
-use tokio::sync::Mutex;
 use tracing::info;
 use utils::get_bucket;
 
 #[derive(Clone, Debug)]
 pub struct AppState {
     pool: Pool<Postgres>,
-    bucket: Arc<Mutex<Bucket>>,
+    bucket: Arc<Bucket>,
 }
 
 #[tokio::main]
@@ -55,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         //.route("/api/tags", delete(remove_tags))
         .with_state(AppState {
             pool,
-            bucket: Arc::new(Mutex::new(bucket)),
+            bucket: Arc::new(bucket),
         })
         .layer(DefaultBodyLimit::disable());
 
