@@ -5,7 +5,6 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use rusqlite::Error;
 use thiserror::Error;
 use tracing::error;
 
@@ -13,9 +12,9 @@ use tracing::error;
 pub enum AppError {
     #[error("Status code {0}")]
     Status(StatusCode),
-    #[error("DB error {0}")]
-    DBError(#[from] Error),
     #[error("Serde error {0}")]
+    DBError(#[from] sqlx::Error),
+    #[error("DB error {0}")]
     SerdeError(#[from] serde_json::Error),
     #[error("S3 error {0}")]
     S3Error(#[from] s3::error::S3Error),

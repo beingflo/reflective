@@ -7,30 +7,32 @@ use axum::{
 use axum_extra::extract::{CookieJar, cookie::Cookie};
 use bcrypt::{hash, verify};
 use serde::{Deserialize, Serialize};
-use tracing::{error, info, warn};
+use sqlx::{prelude::FromRow, query, query_as};
+use tracing::{error, info};
 
 use crate::AppState;
 
 const BCRYPT_COST: u32 = 12;
 
-#[derive(Serialize, Deserialize)]
-pub struct User {
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Account {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(FromRow)]
+pub struct DBAccount {
+    id: i32,
     username: String,
     password: String,
 }
 
-pub struct DBUser {
-    id: u64,
-    password: String,
-}
-
-#[derive(Debug)]
-pub struct AuthenticatedUser {
-    pub id: u64,
+pub struct AuthenticatedAccount {
+    pub id: i32,
     pub username: String,
 }
 
-impl FromRequestParts<AppState> for AuthenticatedUser {
+impl FromRequestParts<AppState> for AuthenticatedAccount {
     type Rejection = AppError;
 
     #[tracing::instrument(skip_all)]
@@ -38,8 +40,6 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let connection = state.conn.lock().await;
-
         let cookies = match CookieJar::from_request_parts(parts, state).await {
             Ok(cookies) => cookies,
             Err(_) => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
@@ -53,94 +53,80 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             }
         };
 
-        let mut stmt = connection.prepare(
+        let result = query_as::<_, DBAccount>(
             "
-                    SELECT user.id, user.username 
-                    FROM user INNER JOIN token ON token.user_id = user.id 
-                    WHERE token.token = ?1
-                ",
-        )?;
+                SELECT account.id, account.username, account.password
+                FROM account INNER JOIN token ON token.account_id = account.id 
+                WHERE token.token = $1;
+            ",
+        )
+        .bind(token.value())
+        .fetch_optional(&state.pool)
+        .await?;
 
-        let mut rows = stmt.query([token.value()])?;
-
-        let user = match rows.next()? {
-            Some(row) => AuthenticatedUser {
-                id: row.get(0)?,
-                username: row.get(1)?,
-            },
-            None => {
-                error!(message = "No user found for token");
-                return Err(AppError::Status(StatusCode::UNAUTHORIZED));
-            }
+        let Some(account) = result else {
+            error!(message = "No account found for token");
+            return Err(AppError::Status(StatusCode::UNAUTHORIZED));
         };
 
-        return Ok(user);
+        Ok(AuthenticatedAccount {
+            id: account.id,
+            username: account.username,
+        })
     }
 }
 
-#[tracing::instrument(skip_all, fields( user = %user.username ))]
+#[tracing::instrument(skip_all, fields( account = %account.username ))]
 pub async fn signup(
     State(state): State<AppState>,
-    Json(user): Json<User>,
+    Json(account): Json<Account>,
 ) -> Result<StatusCode, AppError> {
-    {
-        let connection = state.conn.lock().await;
+    let result =
+        query_as::<_, DBAccount>("SELECT id, username, password FROM account WHERE username = $1;")
+            .bind(&account.username)
+            .fetch_optional(&state.pool)
+            .await?;
 
-        let mut stmt =
-            connection.prepare("SELECT username, password FROM user WHERE username = ?1")?;
+    // Account already exists
+    if let Some(_) = result {
+        error!(message = "Account already exists");
+        return Err(AppError::Status(StatusCode::CONFLICT));
+    };
 
-        let mut rows = stmt.query([&user.username])?;
-
-        // User already exists
-        if let Some(_) = rows.next()? {
-            warn!(message = "User already exists");
-            return Err(AppError::Status(StatusCode::CONFLICT));
-        }
-    }
-
-    let password = match hash(user.password, BCRYPT_COST) {
+    let password = match hash(account.password, BCRYPT_COST) {
         Ok(pw) => pw,
         Err(_) => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
     };
 
-    let connection = state.conn.lock().await;
+    query("INSERT INTO account (username, password) VALUES ($1, $2);")
+        .bind(account.username)
+        .bind(password)
+        .execute(&state.pool)
+        .await?;
 
-    connection.execute(
-        "INSERT INTO user (username, password) VALUES (?1, ?2)",
-        (&user.username, password),
-    )?;
+    info!(message = "Account signed up");
 
-    info!(message = "User signed up");
     Ok(StatusCode::OK)
 }
 
-#[tracing::instrument(skip_all, fields( user = %user.username ))]
+#[tracing::instrument(skip_all, fields( account = %account.username ))]
 pub async fn login(
     jar: CookieJar,
     State(state): State<AppState>,
-    Json(user): Json<User>,
+    Json(account): Json<Account>,
 ) -> Result<(CookieJar, StatusCode), AppError> {
-    let db_user = {
-        let connection = state.conn.lock().await;
+    let result =
+        query_as::<_, DBAccount>("SELECT id, username, password FROM account WHERE username = $1;")
+            .bind(&account.username)
+            .fetch_optional(&state.pool)
+            .await?;
 
-        let mut stmt = connection.prepare("SELECT id, password FROM user WHERE username = ?1")?;
-        let mut rows = stmt.query([user.username])?;
-
-        let db_user = match rows.next()? {
-            Some(row) => DBUser {
-                id: row.get(0)?,
-                password: row.get(1)?,
-            },
-            None => {
-                error!(message = "User doesn't exist");
-                return Err(AppError::Status(StatusCode::UNAUTHORIZED));
-            }
-        };
-
-        db_user
+    let Some(db_account) = result else {
+        error!(message = "Account doesn't exist");
+        return Err(AppError::Status(StatusCode::UNAUTHORIZED));
     };
 
-    match verify(user.password, &db_user.password) {
+    match verify(account.password, &db_account.password) {
         Err(_) => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
         Ok(false) => {
             error!("Password doesn't match");
@@ -151,12 +137,11 @@ pub async fn login(
 
     let auth_token = get_auth_token();
 
-    let connection = state.conn.lock().await;
-
-    connection.execute(
-        "INSERT INTO token (token, user_id) VALUES (?1, ?2)",
-        (&auth_token, &db_user.id),
-    )?;
+    query("INSERT INTO token (token, account_id) VALUES ($1, $2);")
+        .bind(&auth_token)
+        .bind(db_account.id)
+        .execute(&state.pool)
+        .await?;
 
     let jar = jar.add(
         Cookie::build(("token", auth_token))
@@ -164,6 +149,7 @@ pub async fn login(
             .http_only(true),
     );
 
-    info!(message = "User logged in");
+    info!(message = "Account logged in");
+
     Ok((jar, StatusCode::OK))
 }
