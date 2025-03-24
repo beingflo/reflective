@@ -53,14 +53,15 @@ impl FromRequestParts<AppState> for AuthenticatedAccount {
             }
         };
 
-        let result = query_as::<_, DBAccount>(
+        let result = query_as!(
+            DBAccount,
             "
                 SELECT account.id, account.username, account.password
                 FROM account INNER JOIN token ON token.account_id = account.id 
                 WHERE token.token = $1;
             ",
+            token.value()
         )
-        .bind(token.value())
         .fetch_optional(&state.pool)
         .await?;
 
@@ -81,11 +82,13 @@ pub async fn signup(
     State(state): State<AppState>,
     Json(account): Json<Account>,
 ) -> Result<StatusCode, AppError> {
-    let result =
-        query_as::<_, DBAccount>("SELECT id, username, password FROM account WHERE username = $1;")
-            .bind(&account.username)
-            .fetch_optional(&state.pool)
-            .await?;
+    let result = query_as!(
+        DBAccount,
+        "SELECT id, username, password FROM account WHERE username = $1;",
+        &account.username
+    )
+    .fetch_optional(&state.pool)
+    .await?;
 
     // Account already exists
     if let Some(_) = result {
@@ -98,11 +101,13 @@ pub async fn signup(
         Err(_) => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
     };
 
-    query("INSERT INTO account (username, password) VALUES ($1, $2);")
-        .bind(account.username)
-        .bind(password)
-        .execute(&state.pool)
-        .await?;
+    query!(
+        "INSERT INTO account (username, password) VALUES ($1, $2);",
+        account.username,
+        password
+    )
+    .execute(&state.pool)
+    .await?;
 
     info!(message = "Account signed up");
 
@@ -115,11 +120,13 @@ pub async fn login(
     State(state): State<AppState>,
     Json(account): Json<Account>,
 ) -> Result<(CookieJar, StatusCode), AppError> {
-    let result =
-        query_as::<_, DBAccount>("SELECT id, username, password FROM account WHERE username = $1;")
-            .bind(&account.username)
-            .fetch_optional(&state.pool)
-            .await?;
+    let result = query_as!(
+        DBAccount,
+        "SELECT id, username, password FROM account WHERE username = $1;",
+        &account.username
+    )
+    .fetch_optional(&state.pool)
+    .await?;
 
     let Some(db_account) = result else {
         error!(message = "Account doesn't exist");
@@ -137,11 +144,13 @@ pub async fn login(
 
     let auth_token = get_auth_token();
 
-    query("INSERT INTO token (token, account_id) VALUES ($1, $2);")
-        .bind(&auth_token)
-        .bind(db_account.id)
-        .execute(&state.pool)
-        .await?;
+    query!(
+        "INSERT INTO token (token, account_id) VALUES ($1, $2);",
+        &auth_token,
+        db_account.id
+    )
+    .execute(&state.pool)
+    .await?;
 
     let jar = jar.add(
         Cookie::build(("token", auth_token))
