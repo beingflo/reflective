@@ -75,7 +75,7 @@ const Upload: Component = () => {
         setImageStates((prev) => ({ ...prev, [image.name]: 'done' }));
       }
     },
-    { concurrency: 4 },
+    { concurrency: 16 },
   );
 
   createEffect(() => {
