@@ -1,6 +1,7 @@
 mod auth;
 mod error;
 mod image;
+mod tag;
 mod utils;
 
 use std::sync::Arc;
@@ -9,12 +10,13 @@ use auth::{login, signup};
 use axum::{
     Router,
     extract::DefaultBodyLimit,
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 use dotenv::dotenv;
 use image::{get_image, get_images, upload_image};
 use s3::Bucket;
 use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
+use tag::{add_tags, remove_tags};
 use tracing::info;
 use utils::get_bucket;
 
@@ -50,8 +52,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/images", post(upload_image))
         .route("/api/images", get(get_images))
         .route("/api/images/{id}", get(get_image))
-        //.route("/api/tags", post(add_tags))
-        //.route("/api/tags", delete(remove_tags))
+        .route("/api/tags", post(add_tags))
+        .route("/api/tags", delete(remove_tags))
         .with_state(AppState {
             pool,
             bucket: Arc::new(bucket),
