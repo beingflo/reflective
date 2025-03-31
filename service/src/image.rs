@@ -182,7 +182,7 @@ pub async fn upload_image(
     ).execute(&state.pool).await?;
 
     let [original_url, medium_url, small_url] = {
-        let bucket = state.bucket.clone();
+        let bucket = state.bucket.lock().await;
 
         let original = bucket.presign_put(&object_name_original, UPLOAD_LINK_TIMEOUT_SEC, None)?;
         let medium = bucket.presign_put(&object_name_medium, UPLOAD_LINK_TIMEOUT_SEC, None)?;
@@ -299,7 +299,7 @@ pub async fn get_image(
     .fetch_optional(&state.pool)
     .await?;
 
-    let bucket = state.bucket.clone();
+    let bucket = state.bucket.lock().await;
 
     if let Some(variant) = result {
         let url = bucket.presign_get(
