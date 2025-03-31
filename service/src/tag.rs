@@ -41,10 +41,12 @@ pub async fn add_tags(
     let mut tx = state.pool.begin().await?;
 
     for tag in &body.tags {
+        let description = tag.to_lowercase();
+
         query!(
             "INSERT INTO tag (id, description, account_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
             Uuid::now_v7(),
-            tag,
+            description,
             account.id
         )
         .execute(&mut *tx)
