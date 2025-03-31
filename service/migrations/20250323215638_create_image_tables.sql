@@ -2,6 +2,7 @@ CREATE TABLE image (
     id UUID PRIMARY KEY, 
     filename TEXT NOT NULL,
     captured_at TEXT NOT NULL,
+    aspect_ratio FLOAT NOT NULL,
     metadata TEXT,
     account_id UUID references account(id)
 );

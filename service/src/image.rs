@@ -133,18 +133,21 @@ pub async fn upload_image(
         .to_string();
     }
 
+    let original_image = image.decode()?;
+
+    let dimensions = original_image.dimensions();
+    let aspect_ratio = dimensions.0 as f64 / dimensions.1 as f64;
+
     query!(
-        "INSERT INTO image (id, filename, captured_at, metadata, account_id) VALUES ($1, $2, $3, $4, $5);",
+        "INSERT INTO image (id, filename, captured_at,aspect_ratio, metadata, account_id) VALUES ($1, $2, $3, $4, $5, $6);",
         image_id,
         filename,
         timestamp,
+        aspect_ratio,
         serde_json::to_string(&exif_map)?,
         account.id
     ).execute(&state.pool).await?;
 
-    let original_image = image.decode()?;
-
-    let dimensions = original_image.dimensions();
     let medium_dimension = (
         original_image.dimensions().0 / 2,
         original_image.dimensions().1 / 2,
