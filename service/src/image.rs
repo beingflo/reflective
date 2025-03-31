@@ -241,10 +241,10 @@ pub async fn get_images(
     let mut images = query_as!(
         Image,
         "
-            SELECT image.id, image.captured_at, image.aspect_ratio, ARRAY_AGG (tag.description) tags
+            SELECT image.id, image.captured_at, image.aspect_ratio, ARRAY_REMOVE( ARRAY_AGG(tag.description), NULL) tags
             FROM image
-            INNER JOIN image_tag ON image.id = image_tag.image_id
-            INNER JOIN tag ON image_tag.tag_id = tag.id
+            LEFT JOIN image_tag ON image.id = image_tag.image_id
+            LEFT JOIN tag ON image_tag.tag_id = tag.id
             WHERE image.account_id = $1
             GROUP BY image.id;
         ",
