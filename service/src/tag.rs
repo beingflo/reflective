@@ -45,16 +45,20 @@ pub async fn add_tags(
         return Err(AppError::Status(StatusCode::BAD_REQUEST));
     }
 
+    let tags = body
+        .tags
+        .iter()
+        .map(|t| t.to_lowercase())
+        .collect::<Vec<_>>();
+
     // upsert tags to ensure they exist
     let mut tx = state.pool.begin().await?;
 
-    for tag in &body.tags {
-        let description = tag.to_lowercase();
-
+    for tag in &tags {
         query!(
             "INSERT INTO tag (id, description, account_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
             Uuid::now_v7(),
-            description,
+            tag,
             account.id
         )
         .execute(&mut *tx)
@@ -71,7 +75,7 @@ pub async fn add_tags(
     let tags = query_as!(
         Tag,
         "SELECT id FROM tag WHERE description = ANY($1);",
-        &body.tags
+        &tags
     )
     .fetch_all(&state.pool)
     .await?;
