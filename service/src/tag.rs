@@ -23,6 +23,14 @@ pub async fn add_tags(
 ) -> Result<StatusCode, AppError> {
     info!(message = "Adding tags to images");
 
+    if body.tags.len() > 10 {
+        error!(message = "Too many tags");
+        return Err(AppError::Text(
+            StatusCode::BAD_REQUEST,
+            "At most 10 tags allowed".to_string(),
+        ));
+    }
+
     // check if image_ids exist
     let images = query!(
         "SELECT id FROM image WHERE id = ANY($1) AND account_id = $2",

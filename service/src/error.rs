@@ -12,6 +12,8 @@ use tracing::error;
 pub enum AppError {
     #[error("Status code {0}")]
     Status(StatusCode),
+    #[error("Text error {0}: {1}")]
+    Text(StatusCode, String),
     #[error("Serde error {0}")]
     DBError(#[from] sqlx::Error),
     #[error("DB error {0}")]
@@ -40,6 +42,7 @@ impl IntoResponse for AppError {
 
         match self {
             AppError::Status(code) => code.into_response(),
+            AppError::Text(status, description) => (status, description).into_response(),
             AppError::DBError(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
             AppError::SerdeError(error) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
