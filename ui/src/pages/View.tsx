@@ -99,7 +99,7 @@ const View: Component = () => {
           <For each={leftImages()}>
             {(image) => (
               <img
-                class="object-fill w-full min-h-24"
+                class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
                 id={image?.id}
                 loading="lazy"
                 onClick={() => openLightbox(image?.id)}
@@ -112,7 +112,7 @@ const View: Component = () => {
           <For each={middleImages()}>
             {(image) => (
               <img
-                class="object-fill w-full min-h-24"
+                class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
                 id={image?.id}
                 loading="lazy"
                 onClick={() => openLightbox(image?.id)}
@@ -125,7 +125,7 @@ const View: Component = () => {
           <For each={rightImages()}>
             {(image) => (
               <img
-                class="object-fill w-full min-h-24"
+                class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
                 id={image?.id}
                 loading="lazy"
                 onClick={() => openLightbox(image?.id)}
