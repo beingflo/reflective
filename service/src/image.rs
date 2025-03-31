@@ -3,7 +3,7 @@ use std::{collections::HashMap, io::Cursor};
 use crate::{
     auth::AuthenticatedAccount,
     error::AppError,
-    utils::{compress_image, get_id, get_object_name},
+    utils::{compress_image, get_object_name},
 };
 use axum::{
     Json,
@@ -18,6 +18,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Pool, Postgres, query, query_as};
 use tracing::{error, info, trace, warn};
+use uuid::Uuid;
 
 use crate::AppState;
 
@@ -115,7 +116,7 @@ pub async fn upload_image(
         return Err(AppError::Status(StatusCode::CONFLICT));
     };
 
-    let image_id = get_id();
+    let image_id = Uuid::now_v7();
 
     let timestamp;
 
@@ -165,16 +166,16 @@ pub async fn upload_image(
     let object_name_small = get_object_name();
 
     query!(
-        "INSERT INTO variant (object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-        &object_name_original, dimensions.0 as i32, dimensions.1 as i32, original_quality, "original", 1 as i64, &image_id
+        "INSERT INTO variant (id, object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        Uuid::now_v7(), &object_name_original, dimensions.0 as i32, dimensions.1 as i32, original_quality, "original", 1 as i64, &image_id
     ).execute(&state.pool).await?;
     query!(
-        "INSERT INTO variant (object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-        &object_name_medium, medium_dimension.0 as i32, medium_dimension.1 as i32, medium_quality as i32, "medium", 1 as i64, &image_id
+        "INSERT INTO variant (id, object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        Uuid::now_v7(), &object_name_medium, medium_dimension.0 as i32, medium_dimension.1 as i32, medium_quality as i32, "medium", 1 as i64, &image_id
     ).execute(&state.pool).await?;
     query!(
-        "INSERT INTO variant (object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-        &object_name_small, small_dimension.0 as i32, small_dimension.1 as i32, small_quality as i32, "small", 1 as i64, &image_id
+        "INSERT INTO variant (id, object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        Uuid::now_v7(), &object_name_small, small_dimension.0 as i32, small_dimension.1 as i32, small_quality as i32, "small", 1 as i64, &image_id
     ).execute(&state.pool).await?;
 
     let [original_url, medium_url, small_url] = {
@@ -221,7 +222,7 @@ pub async fn upload_image(
 
 #[derive(Serialize, FromRow)]
 pub struct Image {
-    id: String,
+    id: Uuid,
     captured_at: String,
 }
 
@@ -263,13 +264,13 @@ pub struct QueryParams {
 ))]
 pub async fn get_image(
     account: AuthenticatedAccount,
-    Path(id): Path<String>,
+    Path(id): Path<Uuid>,
     params: Query<QueryParams>,
     State(state): State<AppState>,
 ) -> Result<Redirect, AppError> {
     info!(message = "get image");
 
-    check_image_exists(&state.pool, account.id, &id).await?;
+    check_image_exists(&state.pool, account.id, id).await?;
 
     #[derive(FromRow)]
     struct Variant {
@@ -311,8 +312,8 @@ pub async fn get_image(
 ))]
 async fn check_image_exists(
     pool: &Pool<Postgres>,
-    account_id: i32,
-    image_id: &str,
+    account_id: Uuid,
+    image_id: Uuid,
 ) -> Result<(), AppError> {
     #[derive(FromRow)]
     struct Image {

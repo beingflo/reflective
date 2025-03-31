@@ -11,7 +11,6 @@ use s3::creds::Credentials;
 use crate::error::AppError;
 
 const AUTH_TOKEN_LENGTH: usize = 64;
-const ID_LENGTH: usize = 16;
 const OBJECT_NAME_LENGTH: usize = 32;
 
 /// Get a secure token for session tokens
@@ -19,15 +18,6 @@ pub fn get_auth_token() -> String {
     rand::rngs::OsRng
         .sample_iter(&Alphanumeric)
         .take(AUTH_TOKEN_LENGTH)
-        .map(char::from)
-        .collect::<String>()
-}
-
-/// Get a random file id to be used in the db
-pub fn get_id() -> String {
-    rand::rngs::OsRng
-        .sample_iter(&Alphanumeric)
-        .take(ID_LENGTH)
         .map(char::from)
         .collect::<String>()
 }

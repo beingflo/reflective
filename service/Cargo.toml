@@ -26,3 +26,4 @@ tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 futures = "0.3.31"
 jiff = "0.2.4"
+uuid = { version = "1.16.0", features = ["v7", "std", "serde"] }

@@ -30,6 +30,8 @@ pub enum AppError {
     MultipartError(#[from] MultipartError),
     #[error("DateParseError error {0}")]
     DateParseError(#[from] jiff::Error),
+    #[error("Uuid parse error {0}")]
+    UuidParseError(#[from] uuid::Error),
 }
 
 impl IntoResponse for AppError {
@@ -38,9 +40,7 @@ impl IntoResponse for AppError {
 
         match self {
             AppError::Status(code) => code.into_response(),
-            AppError::DBError(error) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
-            }
+            AppError::DBError(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
             AppError::SerdeError(error) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
             }
@@ -63,6 +63,9 @@ impl IntoResponse for AppError {
                 (StatusCode::BAD_REQUEST, error.to_string()).into_response()
             }
             AppError::DateParseError(error) => {
+                (StatusCode::BAD_REQUEST, error.to_string()).into_response()
+            }
+            AppError::UuidParseError(error) => {
                 (StatusCode::BAD_REQUEST, error.to_string()).into_response()
             }
         }

@@ -1,11 +1,11 @@
 CREATE TABLE account (
-    id SERIAL PRIMARY KEY, 
+    id UUID PRIMARY KEY, 
     username TEXT NOT NULL,
     password TEXT NOT NULL
 );
 
 CREATE TABLE token (
-    id SERIAL PRIMARY KEY, 
+    id UUID PRIMARY KEY, 
     token TEXT NOT NULL, 
-    account_id INTEGER references account(id)
+    account_id UUID references account(id)
 );

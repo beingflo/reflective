@@ -1,11 +1,11 @@
 CREATE TABLE tag (
-    id SERIAL PRIMARY KEY, 
+    id UUID PRIMARY KEY, 
     description TEXT NOT NULL UNIQUE,
-    account_id INTEGER references account(id)
+    account_id UUID references account(id)
 );
 
 CREATE TABLE image_tag (
-    tag_id INTEGER references tag(id),
-    image_id TEXT references image(id),
+    tag_id UUID references tag(id),
+    image_id UUID references image(id),
     UNIQUE(tag_id, image_id)
 );

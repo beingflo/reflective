@@ -9,6 +9,7 @@ use bcrypt::{hash, verify};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, query, query_as};
 use tracing::{error, info};
+use uuid::Uuid;
 
 use crate::AppState;
 
@@ -22,13 +23,13 @@ pub struct Account {
 
 #[derive(FromRow)]
 pub struct DBAccount {
-    id: i32,
+    id: Uuid,
     username: String,
     password: String,
 }
 
 pub struct AuthenticatedAccount {
-    pub id: i32,
+    pub id: Uuid,
     pub username: String,
 }
 
@@ -102,7 +103,8 @@ pub async fn signup(
     };
 
     query!(
-        "INSERT INTO account (username, password) VALUES ($1, $2);",
+        "INSERT INTO account (id, username, password) VALUES ($1, $2, $3);",
+        Uuid::now_v7(),
         account.username,
         password
     )
@@ -145,7 +147,8 @@ pub async fn login(
     let auth_token = get_auth_token();
 
     query!(
-        "INSERT INTO token (token, account_id) VALUES ($1, $2);",
+        "INSERT INTO token (id, token, account_id) VALUES ($1, $2, $3);",
+        Uuid::now_v7(),
         &auth_token,
         db_account.id
     )

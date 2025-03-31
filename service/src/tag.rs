@@ -3,12 +3,13 @@ use axum::{Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 use sqlx::{query, query_as};
 use tracing::{error, info};
+use uuid::Uuid;
 
 use crate::AppState;
 
 #[derive(Deserialize)]
 pub struct TagChangeRequest {
-    image_ids: Vec<String>,
+    image_ids: Vec<Uuid>,
     tags: Vec<String>,
 }
 
@@ -41,7 +42,8 @@ pub async fn add_tags(
 
     for tag in &body.tags {
         query!(
-            "INSERT INTO tag (description, account_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            "INSERT INTO tag (id, description, account_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+            Uuid::now_v7(),
             tag,
             account.id
         )
@@ -52,7 +54,7 @@ pub async fn add_tags(
 
     #[derive(Debug)]
     struct Tag {
-        id: i32,
+        id: Uuid,
     }
 
     // get tags from db
