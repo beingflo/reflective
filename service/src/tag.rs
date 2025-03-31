@@ -99,8 +99,29 @@ pub async fn add_tags(
 ))]
 pub async fn remove_tags(
     user: AuthenticatedAccount,
-    State(_state): State<AppState>,
-    Json(_body): Json<TagChangeRequest>,
+    State(state): State<AppState>,
+    Json(body): Json<TagChangeRequest>,
 ) -> Result<StatusCode, AppError> {
+    info!(message = "Removing tags from images");
+    let mut tx = state.pool.begin().await?;
+
+    let deleted_relations = query!(
+        "DELETE FROM image_tag USING tag WHERE image_tag.tag_id = tag.id AND image_tag.image_id = ANY($1) AND tag.description = ANY($2);",
+        &body.image_ids,
+        &body.tags
+    ).execute(&mut *tx).await?;
+    info!(deleted_relations = %deleted_relations.rows_affected());
+
+    let deleted_tags = query!(
+        "DELETE FROM tag WHERE id NOT IN (SELECT tag_id FROM image_tag) AND description = ANY($1);",
+        &body.tags
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    info!(deleted_tags = %deleted_tags.rows_affected());
+
+    tx.commit().await?;
+
     Ok(StatusCode::OK)
 }

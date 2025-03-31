@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_SPGZ9o2QKd
 createdAt: 2025-03-23T15:30:27.698559
-updatedAt: 2025-03-23T15:31:43.794066
+updatedAt: 2025-03-31T20:35:25.967549
 workspaceId: wk_2iqsX2rPhP
 folderId: fl_ZHvLbpeeKZ
 authentication: {}
@@ -10,8 +10,8 @@ authenticationType: null
 body:
   text: |-
     {
-      "image_ids": ["1","2","3"],
-      "tags": [""]
+      "image_ids": ["0195ed94-e5fa-7f23-8ed8-cd441cc9c2fc"],
+      "tags": ["france"]
     }
 bodyType: application/json
 description: ''
