@@ -19,7 +19,11 @@ const Upload: Component = () => {
   const navigate = useNavigate();
 
   const cleanup = tinykeys(window, {
-    Escape: () => navigate('/'),
+    Escape: () => {
+      if (images().length === 0) {
+        navigate('/');
+      }
+    },
   });
 
   onCleanup(cleanup);
