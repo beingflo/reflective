@@ -98,50 +98,49 @@ const Upload: Component = () => {
   });
 
   return (
-    <div class="mx-auto flex flex-col w-1/2 min-w-96 py-12">
+    <div class="mx-auto flex flex-col w-full px-12 md:w-2/3 lg:w-1/2 min-w-96 py-12">
       <div class="flex flex-row gap-4 items-baseline">
         <p class="text-4xl md:text-6xl mb-4 text-black dark:text-white font-extrabold">
           Upload
         </p>
       </div>
-      <Show when={uploadComplete()}>
-        <div class="text-emerald-700 mt-4">Upload complete!</div>
-      </Show>
-      <div
-        class="h-60 mt-8 flex flex-col items-center justify-center border border-dashed border-black py-12"
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-      >
-        <label for="file" class="cursor-pointer">
-          <p class="text-black underline inline">Select files</p>
-          <p class="text-black inline"> or drag and drop files here</p>
-        </label>
-        <input
-          disabled={images()?.length > 0}
-          ref={ref}
-          type="file"
-          id="file"
-          class="hidden"
-          multiple
-        />
-      </div>
-      <Show when={Object.values(imageStates())?.length > 0}>
-        <div class="mt-4">
-          Uploaded {uploaded()} / {Object.values(imageStates())?.length}
+      <Show when={images().length === 0}>
+        <div
+          class="h-60 mt-8 flex flex-col items-center justify-center border border-dashed border-black py-12"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+        >
+          <label for="file" class="cursor-pointer">
+            <p class="text-black underline inline">Select files</p>
+            <p class="text-black inline"> or drag and drop files here</p>
+          </label>
+          <input
+            disabled={images()?.length > 0}
+            ref={ref}
+            type="file"
+            id="file"
+            class="hidden"
+            multiple
+          />
         </div>
       </Show>
-      <ul class="mt-4">
+      <Show when={Object.values(imageStates())?.length > 0}>
+        <div class="mt-4">
+          Uploading {uploaded()} / {Object.values(imageStates())?.length}
+        </div>
+      </Show>
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <For each={images()}>
           {(image) => (
             <Show when={imageStates()[image.name] !== 'done'}>
-              <li class="flex justify-between">
-                <span>{image.name}</span>
-                <span>{imageStates()[image.name]}</span>
-              </li>
+              <div class="flex flex-col gap-2">
+                <div class="border border-black border-dashed rounded-sm w-24 h-16" />
+                <div>{image.name}</div>
+              </div>
             </Show>
           )}
         </For>
-      </ul>
+      </div>
     </div>
   );
 };
