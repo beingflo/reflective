@@ -11,6 +11,7 @@ import { useStore } from '../store';
 import Lightbox from '../components/Lightbox';
 import { tinykeys } from 'tinykeys';
 import { validateEvent } from '../utils';
+import { createVisibilityObserver } from '@solid-primitives/intersection-observer';
 
 const View: Component = () => {
   const [state, { setImages }] = useStore();
@@ -39,6 +40,10 @@ const View: Component = () => {
     if (lastImage) {
       setOpenImage(lastImage?.id);
     }
+  };
+
+  const openLightbox = (imageId: string) => {
+    setOpenImage(imageId);
   };
 
   const closeLightbox = () => {
@@ -81,59 +86,105 @@ const View: Component = () => {
     setImages(data);
   });
 
-  const openLightbox = (imageId: string) => {
-    setOpenImage(imageId);
-  };
+  let [numImages, setNumImages] = createSignal(10);
 
-  const leftImages = () => state.images.filter((_, idx) => idx % 3 === 0);
-  const middleImages = () => state.images.filter((_, idx) => idx % 3 === 1);
-  const rightImages = () => state.images.filter((_, idx) => idx % 3 === 2);
+  let [leftImages, setLeftImages] = createSignal([]);
+  let [middleImages, setMiddleImages] = createSignal([]);
+  let [rightImages, setRightImages] = createSignal([]);
+
+  createEffect(() => {
+    let heightLeft = 0;
+    let heightMiddle = 0;
+    let heightRight = 0;
+
+    let imagesLeft = [];
+    let imagesMiddle = [];
+    let imagesRight = [];
+
+    const images = state.images.slice(0, numImages());
+
+    images.forEach((image) => {
+      const imageHeight = 1 / image.aspect_ratio;
+      if (heightLeft <= heightMiddle && heightLeft <= heightRight) {
+        heightLeft += imageHeight;
+        imagesLeft.push(image);
+      } else if (heightMiddle <= heightLeft && heightMiddle <= heightRight) {
+        heightMiddle += imageHeight;
+        imagesMiddle.push(image);
+      } else if (heightRight <= heightLeft && heightRight <= heightMiddle) {
+        heightRight += imageHeight;
+        imagesRight.push(image);
+      }
+    });
+    setLeftImages(imagesLeft);
+    setMiddleImages(imagesMiddle);
+    setRightImages(imagesRight);
+  });
+
+  let el: HTMLDivElement | undefined;
+
+  const visible = createVisibilityObserver({
+    threshold: 1.0,
+    rootMargin: '800px',
+  })(() => el);
+
+  createEffect(() => {
+    if (visible()) {
+      setNumImages((prev) => prev + 20);
+    }
+  });
 
   return (
     <div>
       <Show when={openImage()}>
         <Lightbox imageId={openImage()} />
       </Show>
-      <div class="flex flex-row gap-4 p-8 max-w-screen-2xl mx-auto">
-        <div class="flex flex-col gap-4 w-1/3">
-          <For each={leftImages()}>
-            {(image) => (
-              <img
-                class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
-                id={image?.id}
-                loading="lazy"
-                onClick={() => openLightbox(image?.id)}
-                src={`/api/images/${image?.id}?quality=small`}
-              />
-            )}
-          </For>
+      <div class="flex flex-col w-full">
+        <div class="flex flex-row gap-4 p-8 max-w-screen-2xl mx-auto">
+          <div class="flex flex-col gap-4 w-1/3">
+            <For each={leftImages()}>
+              {(image) => (
+                <div class={`w-full aspect-[${image.aspect_ratio}] h-auto`}>
+                  <img
+                    class="object-fill w-full"
+                    id={image?.id}
+                    onClick={() => openLightbox(image?.id)}
+                    src={`/api/images/${image?.id}?quality=small`}
+                  />
+                </div>
+              )}
+            </For>
+          </div>
+          <div class="flex flex-col gap-4 w-1/3">
+            <For each={middleImages()}>
+              {(image) => (
+                <div class={`w-full aspect-[${image.aspect_ratio}] h-auto`}>
+                  <img
+                    class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
+                    id={image?.id}
+                    onClick={() => openLightbox(image?.id)}
+                    src={`/api/images/${image?.id}?quality=small`}
+                  />
+                </div>
+              )}
+            </For>
+          </div>
+          <div class="flex flex-col gap-4 w-1/3">
+            <For each={rightImages()}>
+              {(image) => (
+                <div class={`w-full aspect-[${image.aspect_ratio}] h-auto`}>
+                  <img
+                    class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
+                    id={image?.id}
+                    onClick={() => openLightbox(image?.id)}
+                    src={`/api/images/${image?.id}?quality=small`}
+                  />
+                </div>
+              )}
+            </For>
+          </div>
         </div>
-        <div class="flex flex-col gap-4 w-1/3">
-          <For each={middleImages()}>
-            {(image) => (
-              <img
-                class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
-                id={image?.id}
-                loading="lazy"
-                onClick={() => openLightbox(image?.id)}
-                src={`/api/images/${image?.id}?quality=small`}
-              />
-            )}
-          </For>
-        </div>
-        <div class="flex flex-col gap-4 w-1/3">
-          <For each={rightImages()}>
-            {(image) => (
-              <img
-                class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
-                id={image?.id}
-                loading="lazy"
-                onClick={() => openLightbox(image?.id)}
-                src={`/api/images/${image?.id}?quality=small`}
-              />
-            )}
-          </For>
-        </div>
+        <div ref={el} class="h-1" />
       </div>
     </div>
   );
