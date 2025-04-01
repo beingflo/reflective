@@ -136,6 +136,16 @@ const View: Component = () => {
 
   return (
     <div>
+      <Show when={state.images.length === 0}>
+        <div class="flex w-full h-96">
+          <div class="m-auto flex flex-col gap-4">
+            <h1 class="text-4xl text-center ">No images found</h1>
+            <p class="text-center">
+              Press <span class="font-bold">U</span> to upload
+            </p>
+          </div>
+        </div>
+      </Show>
       <Show when={openImage()}>
         <Lightbox imageId={openImage()} />
       </Show>
