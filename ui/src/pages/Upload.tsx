@@ -98,7 +98,7 @@ const Upload: Component = () => {
   });
 
   return (
-    <div class="mx-auto flex flex-col w-full px-12 md:w-2/3 lg:w-1/2 min-w-96 py-12">
+    <div class="mx-auto flex flex-col w-full px-12 md:w-2/3 min-w-96 py-12">
       <div class="flex flex-row gap-4 items-baseline">
         <p class="text-4xl md:text-6xl mb-4 text-black dark:text-white font-extrabold">
           Upload
