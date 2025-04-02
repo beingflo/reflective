@@ -17,6 +17,7 @@ const View: Component = () => {
   const [state, { setImages }] = useStore();
   const [openImage, setOpenImage] = createSignal('');
   const [tagMode, setTagMode] = createSignal(true);
+  const [newTagValue, setNewTagValue] = createSignal('');
   const [selectedImages, setSelectedImages] = createSignal([]);
   const navigate = useNavigate();
 
@@ -98,6 +99,32 @@ const View: Component = () => {
     }
 
     if (response.status === 200) {
+      loadImages();
+    }
+  };
+
+  const onNewTag = async (tag: string) => {
+    const response = await fetch('/api/tags', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        image_ids: selectedImages(),
+        tags: [tag],
+      }),
+    }).catch((error) => {
+      console.error('Failed to add tag:', error);
+      throw error;
+    });
+
+    if (response.status === 401) {
+      navigate('/login');
+      return;
+    }
+
+    if (response.status === 200) {
+      setNewTagValue('');
       loadImages();
     }
   };
@@ -223,6 +250,19 @@ const View: Component = () => {
                   </div>
                 )}
               </For>
+              <form
+                onSubmit={(e: SubmitEvent) => {
+                  e.preventDefault();
+                  onNewTag(newTagValue());
+                }}
+              >
+                <input
+                  class="p-1.5 mx-1 outline-none text-xs"
+                  placeholder="new tag"
+                  value={newTagValue()}
+                  onInput={(e) => setNewTagValue(e.currentTarget.value)}
+                />
+              </form>
             </div>
           </div>
         </div>
