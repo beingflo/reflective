@@ -16,6 +16,8 @@ import { createVisibilityObserver } from '@solid-primitives/intersection-observe
 const View: Component = () => {
   const [state, { setImages }] = useStore();
   const [openImage, setOpenImage] = createSignal('');
+  const [tagMode, setTagMode] = createSignal(true);
+  const [selectedImages, setSelectedImages] = createSignal([]);
   const navigate = useNavigate();
 
   const goToNextImage = () => {
@@ -42,32 +44,21 @@ const View: Component = () => {
     }
   };
 
-  const openLightbox = (imageId: string) => {
-    setOpenImage(imageId);
+  const onClickImage = (imageId: string) => {
+    if (tagMode()) {
+      setSelectedImages((prev) => {
+        if (prev.includes(imageId)) {
+          return prev.filter((id) => id !== imageId);
+        } else {
+          return [...prev, imageId];
+        }
+      });
+    } else {
+      setOpenImage(imageId);
+    }
   };
 
-  const closeLightbox = () => {
-    document
-      .getElementById(openImage())
-      ?.scrollIntoView({ behavior: 'instant', block: 'center' });
-    setOpenImage('');
-  };
-
-  const cleanup = tinykeys(window, {
-    ArrowRight: validateEvent(goToNextImage),
-    ArrowLeft: validateEvent(goToLastImage),
-    Escape: closeLightbox,
-    u: validateEvent(() => navigate('/upload')),
-  });
-
-  onCleanup(cleanup);
-
-  // Scroll to top of page on refresh
-  window.onbeforeunload = function () {
-    window.scrollTo(0, 0);
-  };
-
-  createEffect(async () => {
+  const loadImages = async () => {
     const response = await fetch('/api/images', {
       headers: {
         'content-type': 'application/json',
@@ -84,7 +75,68 @@ const View: Component = () => {
 
     const data = await response.json();
     setImages(data);
+  };
+
+  const onRemoveTag = async (tag: string) => {
+    const response = await fetch('/api/tags', {
+      method: 'DELETE',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        image_ids: selectedImages(),
+        tags: [tag],
+      }),
+    }).catch((error) => {
+      console.error('Failed to delete tag:', error);
+      throw error;
+    });
+
+    if (response.status === 401) {
+      navigate('/login');
+      return;
+    }
+
+    if (response.status === 200) {
+      loadImages();
+    }
+  };
+
+  const closeLightbox = () => {
+    document
+      .getElementById(openImage())
+      ?.scrollIntoView({ behavior: 'instant', block: 'center' });
+    setOpenImage('');
+  };
+
+  const cleanup = tinykeys(window, {
+    ArrowRight: validateEvent(goToNextImage),
+    ArrowLeft: validateEvent(goToLastImage),
+    Escape: closeLightbox,
+    t: validateEvent(() => setTagMode((prev) => !prev)),
+    u: validateEvent(() => navigate('/upload')),
   });
+
+  onCleanup(cleanup);
+
+  // Scroll to top of page on refresh
+  window.onbeforeunload = function () {
+    window.scrollTo(0, 0);
+  };
+
+  createEffect(async () => {
+    loadImages();
+  });
+
+  const selectedImagesTags = (): Array<string> => {
+    let tags = new Set();
+    selectedImages().forEach((imageId) => {
+      const image = state?.images?.find((img) => img?.id === imageId);
+      image?.tags?.forEach((tag) => tags.add(tag));
+    });
+
+    return [...tags] as Array<string>;
+  };
 
   let [numImages, setNumImages] = createSignal(10);
 
@@ -149,16 +201,48 @@ const View: Component = () => {
       <Show when={openImage()}>
         <Lightbox imageId={openImage()} />
       </Show>
+      <Show when={tagMode()}>
+        <div class="fixed bottom-0 w-full">
+          <div class="flex flex-row bg-white border-t border-black rounded-sm w-full h-24">
+            <div class="pr-2 border-r border-black w-40 p-2 pt-3">
+              <p class="text-sm text-gray-700">
+                selected images: {selectedImages().length}
+              </p>
+            </div>
+            <div class="p-2 flex flex-row items-start">
+              <For each={selectedImagesTags()}>
+                {(tag) => (
+                  <div class="flex flex-row gap-2 items-center bg-slate-100 text-black rounded-md p-1 px-2 mx-1">
+                    <p class="text-sm">{tag}</p>
+                    <p
+                      class="text-xs cursor-pointer"
+                      onClick={() => onRemoveTag(tag)}
+                    >
+                      ✕
+                    </p>
+                  </div>
+                )}
+              </For>
+            </div>
+          </div>
+        </div>
+      </Show>
       <div class="flex flex-col w-full">
         <div class="flex flex-row gap-4 p-8 max-w-screen-2xl mx-auto">
           <div class="flex flex-col gap-4 w-1/3">
             <For each={leftImages()}>
               {(image) => (
-                <div class={`w-full aspect-[${image.aspect_ratio}] h-auto`}>
+                <div
+                  class={`w-full aspect-[${image.aspect_ratio}] h-auto ${
+                    selectedImages().includes(image?.id) && tagMode()
+                      ? 'outline outline-3 outline-offset-2 outline-blue-600'
+                      : ''
+                  }`}
+                >
                   <img
                     class="object-fill w-full"
                     id={image?.id}
-                    onClick={() => openLightbox(image?.id)}
+                    onClick={() => onClickImage(image?.id)}
                     src={`/api/images/${image?.id}?quality=small`}
                   />
                 </div>
@@ -168,11 +252,17 @@ const View: Component = () => {
           <div class="flex flex-col gap-4 w-1/3">
             <For each={middleImages()}>
               {(image) => (
-                <div class={`w-full aspect-[${image.aspect_ratio}] h-auto`}>
+                <div
+                  class={`w-full aspect-[${image.aspect_ratio}] h-auto ${
+                    selectedImages().includes(image?.id) && tagMode()
+                      ? 'outline outline-3 outline-offset-2 outline-blue-600'
+                      : ''
+                  }`}
+                >
                   <img
                     class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
                     id={image?.id}
-                    onClick={() => openLightbox(image?.id)}
+                    onClick={() => onClickImage(image?.id)}
                     src={`/api/images/${image?.id}?quality=small`}
                   />
                 </div>
@@ -182,11 +272,17 @@ const View: Component = () => {
           <div class="flex flex-col gap-4 w-1/3">
             <For each={rightImages()}>
               {(image) => (
-                <div class={`w-full aspect-[${image.aspect_ratio}] h-auto`}>
+                <div
+                  class={`w-full aspect-[${image.aspect_ratio}] h-auto ${
+                    selectedImages().includes(image?.id) && tagMode()
+                      ? 'outline outline-3 outline-offset-2 outline-blue-600'
+                      : ''
+                  }`}
+                >
                   <img
                     class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
                     id={image?.id}
-                    onClick={() => openLightbox(image?.id)}
+                    onClick={() => onClickImage(image?.id)}
                     src={`/api/images/${image?.id}?quality=small`}
                   />
                 </div>
