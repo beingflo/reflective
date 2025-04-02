@@ -16,7 +16,8 @@ import { createVisibilityObserver } from '@solid-primitives/intersection-observe
 const View: Component = () => {
   const [state, { setImages }] = useStore();
   const [openImage, setOpenImage] = createSignal('');
-  const [tagMode, setTagMode] = createSignal(true);
+  const [tagMode, setTagMode] = createSignal(false);
+  const [searchMode, setSearchMode] = createSignal(false);
   const [newTagValue, setNewTagValue] = createSignal('');
   const [lastSelectedImage, setLastSelectedImage] = createSignal();
   const [selectedImages, setSelectedImages] = createSignal([]);
@@ -169,6 +170,8 @@ const View: Component = () => {
     Escape: () => {
       if (tagMode()) {
         setSelectedImages([]);
+      } else if (searchMode()) {
+        setSearchMode(false);
       } else {
         closeLightbox();
       }
@@ -176,6 +179,11 @@ const View: Component = () => {
     t: validateEvent(() => {
       if (!openImage()) {
         setTagMode((prev) => !prev);
+      }
+    }),
+    '$mod+k': validateEvent(() => {
+      if (!openImage()) {
+        setSearchMode((prev) => !prev);
       }
     }),
     u: validateEvent(() => navigate('/upload')),
@@ -265,10 +273,37 @@ const View: Component = () => {
       <Show when={openImage()}>
         <Lightbox imageId={openImage()} />
       </Show>
+      <Show when={searchMode()}>
+        <div class="fixed top-0 w-full">
+          <div class="flex flex-row bg-white border-b border-black rounded-sm w-full h-12">
+            <div class="pr-2 border-r border-black w-60 p-2 pt-3">
+              <p class="text-sm text-gray-700">
+                matches images: {state.images.length}
+              </p>
+            </div>
+            <div class="p-2 flex flex-row items-start">
+              <form
+                onSubmit={(e: SubmitEvent) => {
+                  e.preventDefault();
+                  onNewTag(newTagValue());
+                }}
+              >
+                <input
+                  class="p-1.5 mx-1 outline-none text-xs"
+                  placeholder="search"
+                  autofocus
+                  value={newTagValue()}
+                  onInput={(e) => setNewTagValue(e.currentTarget.value)}
+                />
+              </form>
+            </div>
+          </div>
+        </div>
+      </Show>
       <Show when={tagMode()}>
         <div class="fixed bottom-0 w-full">
           <div class="flex flex-row bg-white border-t border-black rounded-sm w-full h-12">
-            <div class="pr-2 border-r border-black w-40 p-2 pt-3">
+            <div class="pr-2 border-r border-black w-60 p-2 pt-3">
               <p class="text-sm text-gray-700">
                 selected images: {selectedImages().length}
               </p>
