@@ -18,6 +18,7 @@ const View: Component = () => {
   const [openImage, setOpenImage] = createSignal('');
   const [tagMode, setTagMode] = createSignal(true);
   const [newTagValue, setNewTagValue] = createSignal('');
+  const [lastSelectedImage, setLastSelectedImage] = createSignal();
   const [selectedImages, setSelectedImages] = createSignal([]);
   const navigate = useNavigate();
 
@@ -45,15 +46,41 @@ const View: Component = () => {
     }
   };
 
-  const onClickImage = (imageId: string) => {
+  const onClickImage = (imageId: string, e: MouseEvent) => {
     if (tagMode()) {
-      setSelectedImages((prev) => {
-        if (prev.includes(imageId)) {
-          return prev.filter((id) => id !== imageId);
-        } else {
-          return [...prev, imageId];
+      if (!e.shiftKey) {
+        setSelectedImages((prev) => {
+          if (prev.includes(imageId)) {
+            return prev.filter((id) => id !== imageId);
+          } else {
+            return [...prev, imageId];
+          }
+        });
+      } else {
+        let lastImageIdx = state.images.findIndex(
+          (image) => image.id === lastSelectedImage(),
+        );
+        let currentImageIdx = state.images.findIndex(
+          (image) => image.id === imageId,
+        );
+
+        if (lastImageIdx === undefined || currentImageIdx === undefined) {
+          return;
         }
-      });
+
+        let startIdx = Math.min(lastImageIdx, currentImageIdx);
+        let endIdx = Math.max(lastImageIdx, currentImageIdx);
+
+        let range = state.images
+          .slice(startIdx, endIdx + 1)
+          .map((image) => image.id);
+
+        setSelectedImages((prev) => {
+          let newSelected = [...new Set([...prev, ...range])];
+          return newSelected;
+        });
+      }
+      setLastSelectedImage(imageId);
     } else {
       setOpenImage(imageId);
     }
@@ -139,8 +166,18 @@ const View: Component = () => {
   const cleanup = tinykeys(window, {
     ArrowRight: validateEvent(goToNextImage),
     ArrowLeft: validateEvent(goToLastImage),
-    Escape: closeLightbox,
-    t: validateEvent(() => setTagMode((prev) => !prev)),
+    Escape: () => {
+      if (tagMode()) {
+        setSelectedImages([]);
+      } else {
+        closeLightbox();
+      }
+    },
+    t: validateEvent(() => {
+      if (!openImage()) {
+        setTagMode((prev) => !prev);
+      }
+    }),
     u: validateEvent(() => navigate('/upload')),
   });
 
@@ -230,7 +267,7 @@ const View: Component = () => {
       </Show>
       <Show when={tagMode()}>
         <div class="fixed bottom-0 w-full">
-          <div class="flex flex-row bg-white border-t border-black rounded-sm w-full h-24">
+          <div class="flex flex-row bg-white border-t border-black rounded-sm w-full h-12">
             <div class="pr-2 border-r border-black w-40 p-2 pt-3">
               <p class="text-sm text-gray-700">
                 selected images: {selectedImages().length}
@@ -243,7 +280,7 @@ const View: Component = () => {
                     <p class="text-sm">{tag}</p>
                     <p
                       class="text-xs cursor-pointer"
-                      onClick={() => onRemoveTag(tag)}
+                      onClick={(e) => onRemoveTag(tag)}
                     >
                       ✕
                     </p>
@@ -282,7 +319,7 @@ const View: Component = () => {
                   <img
                     class="object-fill w-full"
                     id={image?.id}
-                    onClick={() => onClickImage(image?.id)}
+                    onClick={(e) => onClickImage(image?.id, e)}
                     src={`/api/images/${image?.id}?quality=small`}
                   />
                 </div>
@@ -302,7 +339,7 @@ const View: Component = () => {
                   <img
                     class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
                     id={image?.id}
-                    onClick={() => onClickImage(image?.id)}
+                    onClick={(e) => onClickImage(image?.id, e)}
                     src={`/api/images/${image?.id}?quality=small`}
                   />
                 </div>
@@ -322,7 +359,7 @@ const View: Component = () => {
                   <img
                     class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
                     id={image?.id}
-                    onClick={() => onClickImage(image?.id)}
+                    onClick={(e) => onClickImage(image?.id, e)}
                     src={`/api/images/${image?.id}?quality=small`}
                   />
                 </div>
