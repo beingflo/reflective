@@ -273,6 +273,38 @@ pub async fn search_images(
     State(state): State<AppState>,
     body: Json<SearchBody>,
 ) -> Result<(StatusCode, Json<Vec<Image>>), AppError> {
+    #[derive(FromRow, Debug)]
+    struct Tag {
+        id: Uuid,
+        description: String,
+    }
+
+    let tags = query_as!(
+        Tag,
+        "
+            SELECT tag.id, tag.description
+            FROM tag
+            WHERE tag.account_id = $1;
+        ",
+        account.id,
+    )
+    .fetch_all(&state.pool)
+    .await?;
+
+    let search_terms = body.query.split_whitespace().collect::<Vec<_>>();
+    let tags = tags
+        .iter()
+        .filter(|tag| {
+            search_terms
+                .iter()
+                .any(|term| tag.description.contains(term))
+        })
+        .collect::<Vec<_>>();
+
+    if tags.len() == 0 && body.query.len() > 0 {
+        return Ok((StatusCode::OK, Json(vec![])));
+    }
+
     let mut images = query_as!(
         Image,
         "
@@ -280,15 +312,12 @@ pub async fn search_images(
             FROM image
             LEFT JOIN image_tag ON image.id = image_tag.image_id
             LEFT JOIN tag ON image_tag.tag_id = tag.id
-            WHERE image.account_id = $1 AND image_tag.tag_id IN (
-                SELECT tag.id
-                FROM tag
-                WHERE tag.description LIKE '%' || $2 || '%' AND tag.account_id = $1
-            )
-            GROUP BY image.id;
+            WHERE image.account_id = $1
+            GROUP BY image.id
+            HAVING ARRAY_AGG(tag_id::text) @> ARRAY[$2::text[]];
         ",
         account.id,
-        body.query.to_string(),
+        &tags.iter().map(|tag| tag.id.to_string()).collect::<Vec<_>>()
     )
     .fetch_all(&state.pool)
     .await?;
