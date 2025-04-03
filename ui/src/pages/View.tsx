@@ -106,6 +106,29 @@ const View: Component = () => {
     setImages(data);
   };
 
+  const searchImages = async (query: String) => {
+    const response = await fetch('/api/images/search', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+      }),
+    }).catch((error) => {
+      console.error('Failed to search images:', error);
+      throw error;
+    });
+
+    if (response.status === 401) {
+      navigate('/login');
+      return;
+    }
+
+    const data = await response.json();
+    setImages(data);
+  };
+
   const onRemoveTag = async (tag: string) => {
     const response = await fetch('/api/tags', {
       method: 'DELETE',
@@ -278,24 +301,16 @@ const View: Component = () => {
           <div class="flex flex-row bg-white border-b border-black rounded-sm w-full h-12">
             <div class="pr-2 border-r border-black w-60 p-2 pt-3">
               <p class="text-sm text-gray-700">
-                matches images: {state.images.length}
+                matched images: {state.images.length}
               </p>
             </div>
-            <div class="p-2 flex flex-row items-start">
-              <form
-                onSubmit={(e: SubmitEvent) => {
-                  e.preventDefault();
-                  onNewTag(newTagValue());
-                }}
-              >
-                <input
-                  class="p-1.5 mx-1 outline-none text-xs"
-                  placeholder="search"
-                  autofocus
-                  value={newTagValue()}
-                  onInput={(e) => setNewTagValue(e.currentTarget.value)}
-                />
-              </form>
+            <div class="p-2 flex w-full flex-row items-start">
+              <input
+                class="p-1.5 w-full mx-1 outline-none text-xs"
+                placeholder="search"
+                autofocus
+                onInput={(e) => searchImages(e.currentTarget.value)}
+              />
             </div>
           </div>
         </div>
@@ -340,7 +355,7 @@ const View: Component = () => {
         </div>
       </Show>
       <div class="flex flex-col w-full">
-        <div class="flex flex-row gap-4 p-8 max-w-screen-2xl mx-auto">
+        <div class="flex flex-row gap-4 p-8 pt-16 max-w-screen-2xl mx-auto">
           <div class="flex flex-col gap-4 w-1/3">
             <For each={leftImages()}>
               {(image) => (

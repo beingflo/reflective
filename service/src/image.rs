@@ -260,6 +260,46 @@ pub async fn get_images(
     Ok((StatusCode::OK, Json(images)))
 }
 
+#[derive(Deserialize)]
+pub struct SearchBody {
+    query: String,
+}
+
+#[tracing::instrument(skip_all, fields(
+    username = %account.username,
+))]
+pub async fn search_images(
+    account: AuthenticatedAccount,
+    State(state): State<AppState>,
+    body: Json<SearchBody>,
+) -> Result<(StatusCode, Json<Vec<Image>>), AppError> {
+    let mut images = query_as!(
+        Image,
+        "
+            SELECT image.id, image.captured_at, image.aspect_ratio, ARRAY_REMOVE( ARRAY_AGG(tag.description), NULL) tags
+            FROM image
+            LEFT JOIN image_tag ON image.id = image_tag.image_id
+            LEFT JOIN tag ON image_tag.tag_id = tag.id
+            WHERE image.account_id = $1 AND image_tag.tag_id IN (
+                SELECT tag.id
+                FROM tag
+                WHERE tag.description LIKE '%' || $2 || '%' AND tag.account_id = $1
+            )
+            GROUP BY image.id;
+        ",
+        account.id,
+        body.query.to_string(),
+    )
+    .fetch_all(&state.pool)
+    .await?;
+
+    images.sort_by(|a, b| b.captured_at.cmp(&a.captured_at));
+
+    info!(message = "load image list", number_of_files = images.len());
+
+    Ok((StatusCode::OK, Json(images)))
+}
+
 #[derive(Deserialize, Debug)]
 pub struct QueryParams {
     quality: String,
