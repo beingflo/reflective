@@ -19,6 +19,7 @@ const View: Component = () => {
   const [openImage, setOpenImage] = createSignal('');
   const [tagMode, setTagMode] = createSignal(false);
   const [searchMode, setSearchMode] = createSignal(false);
+  const [searchTerm, setSearchTerm] = createSignal('');
   const [newTagValue, setNewTagValue] = createSignal('');
   const [lastSelectedImage, setLastSelectedImage] = createSignal();
   const [selectedImages, setSelectedImages] = createSignal([]);
@@ -108,7 +109,8 @@ const View: Component = () => {
     setImages(data);
   };
 
-  const searchImages = async (query: String) => {
+  const searchImages = async (query: string) => {
+    setSearchTerm(query);
     const response = await fetch('/api/images/search', {
       method: 'POST',
       headers: {
@@ -326,6 +328,7 @@ const View: Component = () => {
             <div class="p-2 flex w-full flex-row items-start">
               <input
                 ref={searchInputRef}
+                value={searchTerm()}
                 class="p-1.5 w-full mx-1 outline-none text-xs"
                 placeholder="search"
                 autofocus
