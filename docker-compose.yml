@@ -1,0 +1,8 @@
+services:
+  reflective:
+    image: "reflective"
+    container_name: reflective
+    ports:
+      - 3001:3001
+    env_file: "service/.env"
+    restart: unless-stopped

@@ -7,7 +7,7 @@ RUN npm install
 COPY ./ui/ ./
 RUN npm run build
 
-FROM rust:1.81 AS chef 
+FROM rust:1.86 AS chef 
 RUN cargo install cargo-chef 
 WORKDIR /usr/src/reflective/service
 
@@ -24,7 +24,7 @@ COPY ./service .
 COPY --from=ui-builder /usr/src/reflective/ui/dist ./ui
 RUN cargo build --release --bin reflective 
 
-FROM debian:bookworm-slim AS runtime
+FROM rust:1.86 AS runtime
 
 WORKDIR /usr/src/app/
 COPY --from=builder /usr/src/reflective/service/target/release/reflective /usr/src/app/

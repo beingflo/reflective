@@ -5,28 +5,25 @@ mod spa;
 mod tag;
 mod utils;
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use auth::{login, signup};
 use axum::{
-    Router,
-    body::Body,
     extract::DefaultBodyLimit,
-    http::{Request, Response, StatusCode},
+    http::StatusCode,
     routing::{delete, get, post},
+    Router,
 };
 use dotenv::dotenv;
 use error::AppError;
 use image::{get_image, search_images, upload_image};
 use s3::Bucket;
 use spa::static_handler;
-use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
+use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use tag::{add_tags, remove_tags};
 use tokio::{signal, sync::Mutex};
-use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
-use tracing::{Span, error, info};
+use tracing::{error, info};
 use utils::get_bucket;
-use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub struct AppState {
@@ -36,6 +33,7 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    info!(message = "Entering startup sequence");
     dotenv().ok();
 
     let bucket = get_bucket()?;
