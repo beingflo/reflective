@@ -192,24 +192,27 @@ const View: Component = () => {
     ArrowLeft: validateEvent(goToLastImage),
     Escape: () => {
       if (tagMode()) {
-        setSelectedImages([]);
+        setTagMode(false);
       } else if (searchMode()) {
         setSearchMode(false);
       } else {
         closeLightbox();
       }
     },
-    t: validateEvent(() => {
+    '$mod+e': () => {
       if (!openImage()) {
         setTagMode((prev) => !prev);
       }
-    }),
-    '$mod+k': validateEvent(() => {
+    },
+    '$mod+c': () => {
+      setSelectedImages([]);
+    },
+    '$mod+k': () => {
       if (!openImage()) {
         setSearchMode((prev) => !prev);
       }
-    }),
-    u: validateEvent(() => navigate('/upload')),
+    },
+    '$mod+u': validateEvent(() => navigate('/upload')),
   });
 
   onCleanup(cleanup);

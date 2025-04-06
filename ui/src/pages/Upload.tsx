@@ -14,16 +14,18 @@ import { tinykeys } from 'tinykeys';
 const Upload: Component = () => {
   const [images, setImages] = createSignal([]);
   const [imageStates, setImageStates] = createSignal({});
-  const [uploadComplete, setUploadComplete] = createSignal(false);
+  const [_, setUploadComplete] = createSignal(false);
   let ref: HTMLInputElement;
   const navigate = useNavigate();
 
+  let goHome = () => {
+    if (images().length === 0) {
+      navigate('/');
+    }
+  };
+
   const cleanup = tinykeys(window, {
-    Escape: () => {
-      if (images().length === 0) {
-        navigate('/');
-      }
-    },
+    Escape: goHome,
   });
 
   onCleanup(cleanup);
