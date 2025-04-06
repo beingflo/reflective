@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Cursor};
+use std::{collections::HashMap, io::Cursor, vec};
 
 use crate::{
     auth::AuthenticatedAccount,
@@ -291,17 +291,27 @@ pub async fn search_images(
     .fetch_all(&state.pool)
     .await?;
 
-    let search_terms = body.query.split_whitespace().collect::<Vec<_>>();
-    let tags = tags
-        .iter()
-        .filter(|tag| {
-            search_terms
-                .iter()
-                .any(|term| tag.description.contains(term))
-        })
-        .collect::<Vec<_>>();
+    let tags = if body.query.len() < 3 {
+        vec![]
+    } else {
+        let search_terms = body
+            .query
+            .split_whitespace()
+            .filter(|term| term.len() > 2)
+            .collect::<Vec<_>>();
+        let mut filtered_tags = vec![];
+        for term in &search_terms {
+            for tag in &tags {
+                if tag.description.contains(term) {
+                    filtered_tags.push(tag);
+                    break;
+                }
+            }
+        }
+        filtered_tags
+    };
 
-    if tags.len() == 0 && body.query.len() > 0 {
+    if tags.is_empty() && body.query.len() >= 3 {
         return Ok((StatusCode::OK, Json(vec![])));
     }
 
