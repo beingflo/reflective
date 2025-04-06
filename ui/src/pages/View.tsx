@@ -2,6 +2,7 @@ import { useNavigate } from '@solidjs/router';
 import {
   type Component,
   createEffect,
+  createMemo,
   createSignal,
   For,
   onCleanup,
@@ -240,6 +241,16 @@ const View: Component = () => {
     return [...tags] as Array<string>;
   };
 
+  let allImageTags = () => {
+    let allTags = selectedImagesTags();
+    selectedImages().forEach((imageId) => {
+      const image = state?.images?.find((img) => img?.id === imageId);
+      allTags = allTags.filter((tag) => image?.tags?.includes(tag));
+    });
+
+    return allTags;
+  };
+
   let [numImages, setNumImages] = createSignal(10);
 
   let [leftImages, setLeftImages] = createSignal([]);
@@ -286,6 +297,7 @@ const View: Component = () => {
     if (visible()) {
       setNumImages((prev) => prev + 20);
     }
+    console.log(allImageTags());
   });
 
   return (
@@ -334,7 +346,13 @@ const View: Component = () => {
             <div class="p-2 flex flex-row items-start overflow-x-scroll">
               <For each={selectedImagesTags()}>
                 {(tag) => (
-                  <div class="flex flex-row gap-2 items-center bg-slate-100 text-black rounded-md p-1 px-2 mx-1">
+                  <div
+                    class={`flex flex-row gap-2 items-center text-black rounded-md p-1 px-2 mx-1 ${
+                      allImageTags().includes(tag)
+                        ? 'bg-slate-300'
+                        : 'bg-slate-100'
+                    }`}
+                  >
                     <p class="text-sm">{tag}</p>
                     <p
                       class="text-xs cursor-pointer"
