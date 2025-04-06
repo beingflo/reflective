@@ -22,6 +22,7 @@ const View: Component = () => {
   const [lastSelectedImage, setLastSelectedImage] = createSignal();
   const [selectedImages, setSelectedImages] = createSignal([]);
   const navigate = useNavigate();
+  let searchInputRef;
 
   const goToNextImage = () => {
     if (!openImage()) return;
@@ -195,6 +196,7 @@ const View: Component = () => {
         setTagMode(false);
       } else if (searchMode()) {
         setSearchMode(false);
+        searchInputRef.blur();
       } else {
         closeLightbox();
       }
@@ -207,9 +209,11 @@ const View: Component = () => {
     '$mod+c': () => {
       setSelectedImages([]);
     },
-    '$mod+k': () => {
+    '$mod+k': (event) => {
       if (!openImage()) {
+        event.preventDefault();
         setSearchMode((prev) => !prev);
+        searchInputRef.focus();
       }
     },
     '$mod+u': validateEvent(() => navigate('/upload')),
@@ -309,6 +313,7 @@ const View: Component = () => {
             </div>
             <div class="p-2 flex w-full flex-row items-start">
               <input
+                ref={searchInputRef}
                 class="p-1.5 w-full mx-1 outline-none text-xs"
                 placeholder="search"
                 autofocus
