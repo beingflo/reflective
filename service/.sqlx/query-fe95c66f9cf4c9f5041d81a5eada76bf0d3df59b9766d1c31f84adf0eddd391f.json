@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM tag WHERE id NOT IN (SELECT tag_id FROM image_tag) AND description = ANY($1);",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fe95c66f9cf4c9f5041d81a5eada76bf0d3df59b9766d1c31f84adf0eddd391f"
+}

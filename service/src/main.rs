@@ -1,25 +1,32 @@
 mod auth;
 mod error;
 mod image;
+mod spa;
 mod tag;
 mod utils;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use auth::{login, signup};
 use axum::{
     Router,
+    body::Body,
     extract::DefaultBodyLimit,
+    http::{Request, Response, StatusCode},
     routing::{delete, get, post},
 };
 use dotenv::dotenv;
+use error::AppError;
 use image::{get_image, search_images, upload_image};
 use s3::Bucket;
+use spa::static_handler;
 use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
 use tag::{add_tags, remove_tags};
-use tokio::sync::Mutex;
-use tracing::info;
+use tokio::{signal, sync::Mutex};
+use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
+use tracing::{Span, error, info};
 use utils::get_bucket;
+use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub struct AppState {
@@ -55,6 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/images/{id}", get(get_image))
         .route("/api/tags", post(add_tags))
         .route("/api/tags", delete(remove_tags))
+        .fallback(static_handler)
         .with_state(AppState {
             pool,
             bucket: Arc::new(Mutex::new(bucket)),
@@ -66,7 +74,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!(message = "Starting server", port);
 
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .map_err(|e| {
+            error!(message = "Failed to start server", error=%e);
+            AppError::Status(StatusCode::SERVICE_UNAVAILABLE)
+        })?;
 
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("Failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("Failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    tokio::select! {
+        _ = ctrl_c => {
+            info!("Ctrl+C received, shutting down")
+        },
+        _ = terminate => {
+            info!("SIGTERM received, shutting down")
+        },
+    }
 }

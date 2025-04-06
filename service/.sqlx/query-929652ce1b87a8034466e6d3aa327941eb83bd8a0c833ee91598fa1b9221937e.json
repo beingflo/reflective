@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM image_tag USING tag WHERE image_tag.tag_id = tag.id AND image_tag.image_id = ANY($1) AND tag.description = ANY($2);",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "929652ce1b87a8034466e6d3aa327941eb83bd8a0c833ee91598fa1b9221937e"
+}
