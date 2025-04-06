@@ -90,34 +90,14 @@ const View: Component = () => {
     }
   };
 
-  const loadImages = async () => {
-    const response = await fetch('/api/images', {
-      headers: {
-        'content-type': 'application/json',
-      },
-    }).catch((error) => {
-      console.error('Failed to fetch images:', error);
-      throw error;
-    });
-
-    if (response.status === 401) {
-      navigate('/login');
-      return;
-    }
-
-    const data = await response.json();
-    setImages(data);
-  };
-
-  const searchImages = async (query: string) => {
-    setSearchTerm(query);
+  const searchImages = async () => {
     const response = await fetch('/api/images/search', {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        query,
+        query: searchTerm(),
       }),
     }).catch((error) => {
       console.error('Failed to search images:', error);
@@ -154,7 +134,7 @@ const View: Component = () => {
     }
 
     if (response.status === 200) {
-      loadImages();
+      searchImages();
     }
   };
 
@@ -180,7 +160,7 @@ const View: Component = () => {
 
     if (response.status === 200) {
       setNewTagValue('');
-      loadImages();
+      searchImages();
     }
   };
 
@@ -230,7 +210,7 @@ const View: Component = () => {
   };
 
   createEffect(async () => {
-    loadImages();
+    searchImages();
   });
 
   const selectedImagesTags = (): Array<string> => {
@@ -332,7 +312,7 @@ const View: Component = () => {
                 class="p-1.5 w-full mx-1 outline-none text-xs"
                 placeholder="search"
                 autofocus
-                onInput={(e) => searchImages(e.currentTarget.value)}
+                onInput={(e) => setSearchTerm(e.currentTarget.value)}
               />
             </div>
           </div>

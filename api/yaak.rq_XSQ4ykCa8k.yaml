@@ -2,26 +2,25 @@ type: http_request
 model: http_request
 id: rq_XSQ4ykCa8k
 createdAt: 2025-02-22T13:02:24.640728
-updatedAt: 2025-03-23T15:30:08.731145
+updatedAt: 2025-04-06T19:01:47.610660
 workspaceId: wk_2iqsX2rPhP
 folderId: fl_NF56fseXRY
 authentication: {}
 authenticationType: null
 body:
-  form:
-  - enabled: true
-    file: /Users/florian/Images/2023/Japan/DSCF2225.jpg
-    id: pYvCBcY4ye
-    name: image
-  - enabled: true
-    id: 5fFSUdEKug
-    name: ''
-    value: ''
-bodyType: null
+  text: |-
+    {
+      "query": ""
+    }
+bodyType: application/json
 description: ''
-headers: []
-method: GET
-name: list
+headers:
+- enabled: true
+  name: Content-Type
+  value: application/json
+  id: XMyuXVsqbP
+method: POST
+name: search
 sortPriority: 1000.0
-url: ${[ BASE_URL ]}/images
+url: ${[ BASE_URL ]}/images/search
 urlParameters: []
