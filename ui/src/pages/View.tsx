@@ -331,7 +331,7 @@ const View: Component = () => {
                 selected images: {selectedImages().length}
               </p>
             </div>
-            <div class="p-2 flex flex-row items-start">
+            <div class="p-2 flex flex-row items-start overflow-x-scroll">
               <For each={selectedImagesTags()}>
                 {(tag) => (
                   <div class="flex flex-row gap-2 items-center bg-slate-100 text-black rounded-md p-1 px-2 mx-1">
