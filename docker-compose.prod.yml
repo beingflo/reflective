@@ -10,6 +10,7 @@ services:
       - reflective-db
     networks:
       - caddy_net
+      - reflective_net
 
   reflective-db:
     image: postgres:latest
@@ -18,12 +19,16 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: reflective
+    networks:
+      - reflective_net
     ports:
       - 5434:5432
     volumes:
-      - ~/tmp/postgres:/var/lib/postgresql/data/
+      - ~/reflective/db/:/var/lib/postgresql/data/
     restart: unless-stopped
 
 networks:
   caddy_net:
     external: true
+  reflective_net:
+    name: reflective_net
