@@ -1,6 +1,6 @@
 services:
   reflective:
-    image: "ghcr.io/beingflo/reflective:0.1.0"
+    image: "ghcr.io/beingflo/reflective:0.1.1"
     container_name: reflective
     ports:
       - 3005:3001
@@ -19,7 +19,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: reflective
     ports:
-      - 5432:5432
+      - 5434:5432
     volumes:
       - ~/tmp/postgres:/var/lib/postgresql/data/
     restart: unless-stopped
