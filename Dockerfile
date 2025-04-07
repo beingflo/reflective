@@ -22,7 +22,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 COPY ./service .
 COPY --from=ui-builder /usr/src/reflective/ui/dist ./ui
-RUN cargo build --release --bin reflective 
+RUN SQLX_OFFLINE=true cargo build --release --bin reflective 
 
 FROM rust:1.86 AS runtime
 

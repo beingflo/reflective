@@ -41,9 +41,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let bucket = get_bucket()?;
 
+    let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
     let pool = PgPoolOptions::new()
         .max_connections(100)
-        .connect("postgres://postgres:postgres@reflective-db/reflective")
+        .connect(db_url.as_str())
         .await?;
 
     info!(message = "Connected to DB");
