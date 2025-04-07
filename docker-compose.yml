@@ -1,8 +1,23 @@
 services:
   reflective:
-    image: "reflective"
+    image: "reflective:latest"
     container_name: reflective
     ports:
       - 3001:3001
-    env_file: "service/.env"
+    env_file: "service/.env.prod"
+    restart: unless-stopped
+    depends_on:
+      - reflective-db
+
+  reflective-db:
+    image: postgres:latest
+    container_name: reflective-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: reflective
+    ports:
+      - 5432:5432
+    volumes:
+      - ~/tmp/postgres:/var/lib/postgresql/data/
     restart: unless-stopped

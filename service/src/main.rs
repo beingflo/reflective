@@ -33,17 +33,17 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    info!(message = "Entering startup sequence");
     dotenv().ok();
-
-    let bucket = get_bucket()?;
-
     let subscriber = tracing_subscriber::fmt().finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
+    info!(message = "Starting application");
+
+    let bucket = get_bucket()?;
+
     let pool = PgPoolOptions::new()
         .max_connections(100)
-        .connect("postgres://postgres:postgres@localhost/reflective")
+        .connect("postgres://postgres:postgres@reflective-db/reflective")
         .await?;
 
     info!(message = "Connected to DB");
