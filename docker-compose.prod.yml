@@ -1,6 +1,6 @@
 services:
   reflective:
-    image: "reflective:latest"
+    image: "ghcr.io/beingflo/reflective:0.1.0"
     container_name: reflective
     ports:
       - 3005:3001
@@ -8,6 +8,8 @@ services:
     restart: unless-stopped
     depends_on:
       - reflective-db
+    networks:
+      - caddy_net
 
   reflective-db:
     image: postgres:latest
@@ -21,3 +23,7 @@ services:
     volumes:
       - ~/tmp/postgres:/var/lib/postgresql/data/
     restart: unless-stopped
+
+networks:
+  caddy_net:
+    external: true
