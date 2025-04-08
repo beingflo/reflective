@@ -289,7 +289,7 @@ const View: Component = () => {
           <div class="m-auto flex flex-col gap-4">
             <h1 class="text-4xl text-center ">No images found</h1>
             <p class="text-center">
-              Press <span class="font-bold">U</span> to upload
+              Press <span class="font-bold">cmd+u</span> to upload
             </p>
           </div>
         </div>
