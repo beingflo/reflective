@@ -1,4 +1,4 @@
-FROM rust:1.86 AS chef 
+FROM rust:bookworm AS chef 
 RUN cargo install cargo-chef 
 WORKDIR /usr/src/reflective/service
 
@@ -25,6 +25,7 @@ COPY --from=ui-builder /usr/src/reflective/ui/dist ./ui
 RUN SQLX_OFFLINE=true cargo build --release --bin reflective 
 
 FROM debian:bookworm-slim AS runtime
+RUN apt update && apt install openssl -y
 
 WORKDIR /usr/src/app/
 COPY --from=builder /usr/src/reflective/service/target/release/reflective /usr/src/app/
