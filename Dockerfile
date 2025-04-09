@@ -24,7 +24,7 @@ COPY ./service .
 COPY --from=ui-builder /usr/src/reflective/ui/dist ./ui
 RUN SQLX_OFFLINE=true cargo build --release --bin reflective 
 
-FROM rust:1.86 AS runtime
+FROM debian:bookworm-slim AS runtime
 
 WORKDIR /usr/src/app/
 COPY --from=builder /usr/src/reflective/service/target/release/reflective /usr/src/app/
