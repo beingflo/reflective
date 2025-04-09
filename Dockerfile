@@ -1,3 +1,7 @@
+FROM rust:1.86 AS chef 
+RUN cargo install cargo-chef 
+WORKDIR /usr/src/reflective/service
+
 FROM node:alpine AS ui-builder
 WORKDIR /usr/src/reflective/ui
 
@@ -6,10 +10,6 @@ COPY ui/package.json ui/package-lock.json ./
 RUN npm install
 COPY ./ui/ ./
 RUN npm run build
-
-FROM rust:1.86 AS chef 
-RUN cargo install cargo-chef 
-WORKDIR /usr/src/reflective/service
 
 FROM chef AS planner
 COPY ./service .
