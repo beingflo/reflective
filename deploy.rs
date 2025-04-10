@@ -15,7 +15,6 @@ use cmd_lib::*;
 use semver::Version;
 use std::io;
 use std::io::Write;
-use std::io::Read;
 use std::fs;
 
 #[derive(Parser, Debug)]
@@ -35,7 +34,7 @@ fn main() -> CmdResult {
 
     if status.len() > 0 {
         run_cmd! (error "There are uncommitted changes")?;
-        //return Ok(());
+        return Ok(());
     }
 
     let version = run_fun! (
@@ -92,6 +91,7 @@ fn main() -> CmdResult {
     run_cmd! (
         docker --context omni compose --file docker-compose.prod.yml pull;
         docker --context omni compose --file docker-compose.prod.yml up -d;
+
         git commit -am "Release $new_version";
         git tag "$new_version";
         git push origin --tags;
