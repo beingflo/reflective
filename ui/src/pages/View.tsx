@@ -385,46 +385,6 @@ const View: Component = () => {
               )}
             </For>
           </div>
-          <div class="flex flex-col gap-4 w-1/3">
-            <For each={middleImages()}>
-              {(image) => (
-                <div
-                  class={`w-full aspect-[${image.aspect_ratio}] h-auto ${
-                    selectedImages().includes(image?.id) && tagMode()
-                      ? 'outline outline-3 outline-offset-2 outline-blue-600'
-                      : ''
-                  }`}
-                >
-                  <img
-                    class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
-                    id={image?.id}
-                    onClick={(e) => onClickImage(image?.id, e)}
-                    src={`/api/images/${image?.id}?quality=small`}
-                  />
-                </div>
-              )}
-            </For>
-          </div>
-          <div class="flex flex-col gap-4 w-1/3">
-            <For each={rightImages()}>
-              {(image) => (
-                <div
-                  class={`w-full aspect-[${image.aspect_ratio}] h-auto ${
-                    selectedImages().includes(image?.id) && tagMode()
-                      ? 'outline outline-3 outline-offset-2 outline-blue-600'
-                      : ''
-                  }`}
-                >
-                  <img
-                    class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
-                    id={image?.id}
-                    onClick={(e) => onClickImage(image?.id, e)}
-                    src={`/api/images/${image?.id}?quality=small`}
-                  />
-                </div>
-              )}
-            </For>
-          </div>
         </div>
         <div ref={el} class="h-1" />
       </div>
