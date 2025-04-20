@@ -25,7 +25,7 @@ COPY --from=ui-builder /usr/src/reflective/ui/dist ./ui
 RUN SQLX_OFFLINE=true cargo build --release --bin reflective 
 
 FROM debian:bookworm-slim AS runtime
-RUN apt update && apt install openssl -y
+RUN apt update && apt install -y ca-certificates && apt install -y openssl
 
 WORKDIR /usr/src/app/
 COPY --from=builder /usr/src/reflective/service/target/release/reflective /usr/src/app/
