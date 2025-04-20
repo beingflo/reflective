@@ -98,24 +98,6 @@ pub async fn upload_image(
         filename: String,
     }
 
-    let result = query_as!(
-        File,
-        "
-            SELECT filename 
-            FROM image
-            WHERE account_id = $1 AND filename = $2;
-        ",
-        account.id,
-        filename
-    )
-    .fetch_optional(&state.pool)
-    .await?;
-
-    if let Some(file) = result {
-        error!(message = "image already exists", file = %file.filename);
-        return Err(AppError::Status(StatusCode::CONFLICT));
-    };
-
     let image_id = Uuid::now_v7();
 
     let timestamp;
@@ -133,13 +115,32 @@ pub async fn upload_image(
         .to_string();
     }
 
+    let result = query_as!(
+        File,
+        "
+            SELECT filename 
+            FROM image
+            WHERE account_id = $1 AND filename = $2 AND captured_at = $3;
+        ",
+        account.id,
+        filename,
+        timestamp
+    )
+    .fetch_optional(&state.pool)
+    .await?;
+
+    if let Some(file) = result {
+        error!(message = "image already exists", file = %file.filename);
+        return Err(AppError::Status(StatusCode::CONFLICT));
+    };
+
     let original_image = image.decode()?;
 
     let dimensions = original_image.dimensions();
     let aspect_ratio = dimensions.0 as f64 / dimensions.1 as f64;
 
     query!(
-        "INSERT INTO image (id, filename, captured_at,aspect_ratio, metadata, account_id) VALUES ($1, $2, $3, $4, $5, $6);",
+        "INSERT INTO image (id, filename, captured_at, aspect_ratio, metadata, account_id) VALUES ($1, $2, $3, $4, $5, $6);",
         image_id,
         filename,
         timestamp,

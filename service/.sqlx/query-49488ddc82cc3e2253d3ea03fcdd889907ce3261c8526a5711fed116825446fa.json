@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT filename \n            FROM image\n            WHERE account_id = $1 AND filename = $2;\n        ",
+  "query": "\n            SELECT filename \n            FROM image\n            WHERE account_id = $1 AND filename = $2 AND captured_at = $3;\n        ",
   "describe": {
     "columns": [
       {
@@ -12,6 +12,7 @@
     "parameters": {
       "Left": [
         "Uuid",
+        "Text",
         "Text"
       ]
     },
@@ -19,5 +20,5 @@
       false
     ]
   },
-  "hash": "f19e32920046d6e9b33eeee88f1a67a24ca65c5961573ce0b2cd328a8f46d803"
+  "hash": "49488ddc82cc3e2253d3ea03fcdd889907ce3261c8526a5711fed116825446fa"
 }
