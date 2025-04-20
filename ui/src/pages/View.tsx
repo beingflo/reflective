@@ -342,7 +342,7 @@ const View: Component = () => {
         </div>
       </Show>
       <div class="flex flex-col w-full">
-        <div class="w-full grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4 p-8 pt-16 max-w-screen-2xl mx-auto">
+        <div class="w-full grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 p-4 gap-4 md:gap-4 md:p-8 pt-16 max-w-screen-2xl mx-auto">
           <For each={state.images}>
             {(image) => (
               <div
