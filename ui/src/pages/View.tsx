@@ -19,6 +19,7 @@ const View: Component = () => {
   const [openImage, setOpenImage] = createSignal('');
   const [tagMode, setTagMode] = createSignal(false);
   const [searchMode, setSearchMode] = createSignal(false);
+  const [emptyTagMode, setEmptyTagMode] = createSignal(false);
   const [searchTerm, setSearchTerm] = createSignal('');
   const [newTagValue, setNewTagValue] = createSignal('');
   const [lastSelectedImage, setLastSelectedImage] = createSignal();
@@ -26,12 +27,20 @@ const View: Component = () => {
   const navigate = useNavigate();
   let searchInputRef;
 
+  const images = () => {
+    if (emptyTagMode()) {
+      return state.images.filter((image) => image.tags.length === 0);
+    }
+
+    return state.images;
+  };
+
   const goToNextImage = () => {
     if (!openImage()) return;
-    const currentIndex = state.images.findIndex(
+    const currentIndex = images().findIndex(
       (image) => image.id === openImage(),
     );
-    const nextImage = state.images[currentIndex + 1];
+    const nextImage = images()[currentIndex + 1];
 
     if (nextImage) {
       setOpenImage(nextImage?.id);
@@ -40,10 +49,10 @@ const View: Component = () => {
 
   const goToLastImage = () => {
     if (!openImage()) return;
-    const currentIndex = state.images.findIndex(
+    const currentIndex = images().findIndex(
       (image) => image.id === openImage(),
     );
-    const lastImage = state.images[currentIndex - 1];
+    const lastImage = images()[currentIndex - 1];
 
     if (lastImage) {
       setOpenImage(lastImage?.id);
@@ -61,10 +70,10 @@ const View: Component = () => {
           }
         });
       } else {
-        let lastImageIdx = state.images.findIndex(
+        let lastImageIdx = images().findIndex(
           (image) => image.id === lastSelectedImage(),
         );
-        let currentImageIdx = state.images.findIndex(
+        let currentImageIdx = images().findIndex(
           (image) => image.id === imageId,
         );
 
@@ -75,7 +84,7 @@ const View: Component = () => {
         let startIdx = Math.min(lastImageIdx, currentImageIdx);
         let endIdx = Math.max(lastImageIdx, currentImageIdx);
 
-        let range = state.images
+        let range = images()
           .slice(startIdx, endIdx + 1)
           .map((image) => image.id);
 
@@ -192,6 +201,10 @@ const View: Component = () => {
     '$mod+c': () => {
       setSelectedImages([]);
     },
+    '$mod+m': (event) => {
+      event.preventDefault();
+      setEmptyTagMode((prev) => !prev);
+    },
     '$mod+k': (event) => {
       if (!openImage()) {
         event.preventDefault();
@@ -234,7 +247,7 @@ const View: Component = () => {
   };
 
   createEffect(() => {
-    if (state.images.length === 0) {
+    if (images().length === 0) {
       return;
     }
 
@@ -262,7 +275,7 @@ const View: Component = () => {
 
   return (
     <div>
-      <Show when={state.images.length === 0}>
+      <Show when={images().length === 0}>
         <div class="flex w-full h-96">
           <div class="m-auto flex flex-col gap-4">
             <h1 class="text-4xl text-center ">No images found</h1>
@@ -280,7 +293,7 @@ const View: Component = () => {
           <div class="flex flex-row bg-white border-b border-black rounded-sm w-full h-12">
             <div class="pr-2 border-r border-black w-60 p-2 pt-3">
               <p class="text-sm text-gray-700">
-                matched images: {state.images.length}
+                matched images: {images().length}
               </p>
             </div>
             <div class="p-2 flex w-full flex-row items-start">
@@ -343,7 +356,7 @@ const View: Component = () => {
       </Show>
       <div class="flex flex-col w-full">
         <div class="w-full grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 p-4 gap-4 md:gap-4 md:p-8 pt-16 max-w-screen-2xl mx-auto">
-          <For each={state.images}>
+          <For each={images()}>
             {(image) => (
               <div
                 class={`w-full aspect-square ${
