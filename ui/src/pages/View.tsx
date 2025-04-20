@@ -233,53 +233,31 @@ const View: Component = () => {
     return allTags;
   };
 
-  let [numImages, setNumImages] = createSignal(10);
-
-  let [leftImages, setLeftImages] = createSignal([]);
-  let [middleImages, setMiddleImages] = createSignal([]);
-  let [rightImages, setRightImages] = createSignal([]);
-
   createEffect(() => {
-    let heightLeft = 0;
-    let heightMiddle = 0;
-    let heightRight = 0;
-
-    let imagesLeft = [];
-    let imagesMiddle = [];
-    let imagesRight = [];
-
-    const images = state.images.slice(0, numImages());
-
-    images.forEach((image) => {
-      const imageHeight = 1 / image.aspect_ratio;
-      if (heightLeft <= heightMiddle && heightLeft <= heightRight) {
-        heightLeft += imageHeight;
-        imagesLeft.push(image);
-      } else if (heightMiddle <= heightLeft && heightMiddle <= heightRight) {
-        heightMiddle += imageHeight;
-        imagesMiddle.push(image);
-      } else if (heightRight <= heightLeft && heightRight <= heightMiddle) {
-        heightRight += imageHeight;
-        imagesRight.push(image);
-      }
-    });
-    setLeftImages(imagesLeft);
-    setMiddleImages(imagesMiddle);
-    setRightImages(imagesRight);
-  });
-
-  let el: HTMLDivElement | undefined;
-
-  const visible = createVisibilityObserver({
-    threshold: 1.0,
-    rootMargin: '800px',
-  })(() => el);
-
-  createEffect(() => {
-    if (visible()) {
-      setNumImages((prev) => prev + 20);
+    if (state.images.length === 0) {
+      return;
     }
-    console.log(allImageTags());
+
+    let lazyloadImages = document.querySelectorAll('img');
+
+    var imageObserver = new IntersectionObserver(
+      (entries, _) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) {
+            return;
+          }
+          var image = entry.target;
+          image.setAttribute('src', image.getAttribute('data-src'));
+          image.classList.remove('lazy');
+          imageObserver.unobserve(image);
+        });
+      },
+      { rootMargin: '200%' },
+    );
+
+    lazyloadImages.forEach(function (image) {
+      imageObserver.observe(image);
+    });
   });
 
   return (
@@ -364,69 +342,26 @@ const View: Component = () => {
         </div>
       </Show>
       <div class="flex flex-col w-full">
-        <div class="flex flex-row gap-4 p-8 pt-16 max-w-screen-2xl mx-auto">
-          <div class="flex flex-col gap-4 w-1/3">
-            <For each={leftImages()}>
-              {(image) => (
-                <div
-                  class={`w-full aspect-[${image.aspect_ratio}] h-auto ${
-                    selectedImages().includes(image?.id) && tagMode()
-                      ? 'outline outline-3 outline-offset-2 outline-blue-600'
-                      : ''
-                  }`}
-                >
-                  <img
-                    class="object-fill w-full"
-                    id={image?.id}
-                    onClick={(e) => onClickImage(image?.id, e)}
-                    src={`/api/images/${image?.id}?quality=small`}
-                  />
-                </div>
-              )}
-            </For>
-          </div>
-          <div class="flex flex-col gap-4 w-1/3">
-            <For each={middleImages()}>
-              {(image) => (
-                <div
-                  class={`w-full aspect-[${image.aspect_ratio}] h-auto ${
-                    selectedImages().includes(image?.id) && tagMode()
-                      ? 'outline outline-3 outline-offset-2 outline-blue-600'
-                      : ''
-                  }`}
-                >
-                  <img
-                    class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
-                    id={image?.id}
-                    onClick={(e) => onClickImage(image?.id, e)}
-                    src={`/api/images/${image?.id}?quality=small`}
-                  />
-                </div>
-              )}
-            </For>
-          </div>
-          <div class="flex flex-col gap-4 w-1/3">
-            <For each={rightImages()}>
-              {(image) => (
-                <div
-                  class={`w-full aspect-[${image.aspect_ratio}] h-auto ${
-                    selectedImages().includes(image?.id) && tagMode()
-                      ? 'outline outline-3 outline-offset-2 outline-blue-600'
-                      : ''
-                  }`}
-                >
-                  <img
-                    class={`object-fill w-full aspect-[${image.aspect_ratio}]`}
-                    id={image?.id}
-                    onClick={(e) => onClickImage(image?.id, e)}
-                    src={`/api/images/${image?.id}?quality=small`}
-                  />
-                </div>
-              )}
-            </For>
-          </div>
+        <div class="w-full grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4 p-8 pt-16 max-w-screen-2xl mx-auto">
+          <For each={state.images}>
+            {(image) => (
+              <div
+                class={`w-full aspect-square ${
+                  selectedImages().includes(image?.id) && tagMode()
+                    ? 'outline outline-3 outline-offset-2 outline-blue-600'
+                    : ''
+                }`}
+              >
+                <img
+                  class="lazy object-cover w-full h-full"
+                  id={image?.id}
+                  onClick={(e) => onClickImage(image?.id, e)}
+                  data-src={`/api/images/${image?.id}?quality=small`}
+                />
+              </div>
+            )}
+          </For>
         </div>
-        <div ref={el} class="h-1" />
       </div>
     </div>
   );
