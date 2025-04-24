@@ -6,8 +6,15 @@ export const storeName = 'store';
 
 const StoreContext = createContext<any[]>();
 
+export type Image = {
+  id: string;
+  captured_at: string;
+  aspect_ratio: number;
+  tags: Array<string>;
+};
+
 export type State = {
-  images: Array<String>;
+  images: Array<Image>;
   screen: Screen;
 };
 

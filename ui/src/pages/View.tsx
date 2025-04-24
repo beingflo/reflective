@@ -199,7 +199,9 @@ const View: Component = () => {
       }
     },
     '$mod+c': () => {
-      setSelectedImages([]);
+      if (tagMode()) {
+        setSelectedImages([]);
+      }
     },
     '$mod+m': (event) => {
       event.preventDefault();
@@ -286,7 +288,7 @@ const View: Component = () => {
         </div>
       </Show>
       <Show when={openImage()}>
-        <Lightbox imageId={openImage()} />
+        <Lightbox imageId={openImage()} images={images()} />
       </Show>
       <Show when={searchMode()}>
         <div class="fixed top-0 w-full">

@@ -1,17 +1,17 @@
-import { useNavigate } from '@solidjs/router';
 import { createEffect, type Component } from 'solid-js';
-import { useStore } from '../store';
+import { useStore, type Image } from '../store';
 
 export type LightboxProps = {
   imageId: string;
+  images: Array<Image>;
 };
 
 const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
-  const [state, { setImages }] = useStore();
+  const [, { setImages }] = useStore();
 
   // Fetch images in case of reload
   createEffect(async () => {
-    if (state.images.length === 0) {
+    if (props.images.length === 0) {
       const response = await fetch('/api/images', {
         headers: {
           'content-type': 'application/json',
@@ -23,9 +23,12 @@ const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
   });
 
   createEffect(() => {
-    const currentIndex = state.images.indexOf(props.imageId);
-    const nextImage = state.images[currentIndex + 1];
-    const lastImage = state.images[currentIndex - 1];
+    // todo, shouldn't be state.images but images from list above
+    const currentIndex = props.images.findIndex(
+      (image) => image.id === props.imageId,
+    );
+    const nextImage = props.images[currentIndex + 1];
+    const lastImage = props.images[currentIndex - 1];
 
     if (nextImage) {
       new Image().src = `/api/images/${nextImage?.id}?quality=medium`;
