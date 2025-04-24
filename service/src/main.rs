@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     let pool = PgPoolOptions::new()
-        .max_connections(100)
+        .max_connections(80)
         .connect(db_url.as_str())
         .await?;
 
