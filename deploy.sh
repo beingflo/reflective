@@ -17,7 +17,7 @@ new_version=${new_version:-${next_version}}
 
 cd service; cargo set-version "${new_version}" || die "Failed to set version in Cargo.toml"; cd ..
 
-docker buildx build --platform=linux/amd64 -t "ghcr.io/beingflo/reflective:${new_version}" . || die "Failed to build docker image"
+docker buildx build -t "ghcr.io/beingflo/reflective:${new_version}" . || die "Failed to build docker image"
 docker push "ghcr.io/beingflo/reflective:${new_version}" || die "Failed to push docker image"
 
 sed -i '' -e "s/image: \"ghcr.io\/beingflo\/reflective:${version}\"/image: \"ghcr.io\/beingflo\/reflective:${new_version}\"/" ./docker-compose.prod.yml || die "Failed to write new version to docker compose file"
