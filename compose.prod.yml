@@ -27,6 +27,15 @@ services:
       - reflective-pg:/var/lib/postgresql/data/
     restart: unless-stopped
 
+  pg_backup_s3:
+    image: siemens/postgres-backup-s3:17
+    env_file: ".env.prod.backup"
+    environment:
+      SCHEDULE: "@every 1m"
+      ENABLE_METRICS: false
+    networks:
+      - reflective_net
+
 networks:
   caddy_net:
     external: true
