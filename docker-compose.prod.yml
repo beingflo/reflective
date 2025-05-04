@@ -24,7 +24,7 @@ services:
     ports:
       - 5434:5432
     volumes:
-      - ~/reflective/db/:/var/lib/postgresql/data/
+      - reflective-pg:/var/lib/postgresql/data/
     restart: unless-stopped
 
 networks:
@@ -32,3 +32,19 @@ networks:
     external: true
   reflective_net:
     name: reflective_net
+
+volumes:
+  reflective-pg:
+    name: 'reflective-pg'
+
+    restart: unless-stopped
+
+networks:
+  caddy_net:
+    external: true
+  reflective_net:
+    name: reflective_net
+
+volumes:
+  reflective-pg:
+    name: 'reflective-pg'
