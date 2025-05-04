@@ -20,10 +20,10 @@ cd service; cargo set-version "${new_version}" || die "Failed to set version in 
 docker buildx build -t "ghcr.io/beingflo/reflective:${new_version}" . || die "Failed to build docker image"
 docker push "ghcr.io/beingflo/reflective:${new_version}" || die "Failed to push docker image"
 
-sed -i '' -e "s/image: \"ghcr.io\/beingflo\/reflective:${version}\"/image: \"ghcr.io\/beingflo\/reflective:${new_version}\"/" ./docker-compose.prod.yml || die "Failed to write new version to docker compose file"
+sed -i '' -e "s/image: \"ghcr.io\/beingflo\/reflective:${version}\"/image: \"ghcr.io\/beingflo\/reflective:${new_version}\"/" ./compose.prod.yml || die "Failed to write new version to docker compose file"
 
-docker --context arm compose --file docker-compose.prod.yml pull || die "Failed to pull new image"
-docker --context arm compose --file docker-compose.prod.yml up -d || die "Failed to bring compose up"
+docker --context arm compose --file compose.prod.yml pull || die "Failed to pull new image"
+docker --context arm compose --file compose.prod.yml up -d || die "Failed to bring compose up"
 
 git commit -am "Release ${new_version}"
 git tag "${new_version}"

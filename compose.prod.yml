@@ -35,16 +35,4 @@ networks:
 
 volumes:
   reflective-pg:
-    name: 'reflective-pg'
-
-    restart: unless-stopped
-
-networks:
-  caddy_net:
-    external: true
-  reflective_net:
-    name: reflective_net
-
-volumes:
-  reflective-pg:
-    name: 'reflective-pg'
+    name: "reflective-pg"
