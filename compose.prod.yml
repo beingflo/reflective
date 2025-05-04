@@ -29,6 +29,7 @@ services:
 
   pg_backup_s3:
     image: "ghcr.io/beingflo/postgres-backup-s3:1.2"
+    restart: unless-stopped
     env_file: ".env.prod.backup"
     networks:
       - reflective_net
