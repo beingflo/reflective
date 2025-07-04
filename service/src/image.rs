@@ -3,7 +3,8 @@ use std::{collections::HashMap, io::Cursor, vec};
 use crate::{
     auth::AuthenticatedAccount,
     error::AppError,
-    utils::{compress_image, get_object_name},
+    utils::get_object_name,
+    worker::ImageProcessingJob,
 };
 use axum::{
     extract::{Multipart, Path, Query, State},
@@ -11,7 +12,6 @@ use axum::{
     response::Redirect,
     Json,
 };
-use futures::join;
 use image::{GenericImageView, ImageDecoder, ImageReader};
 use jiff::{fmt::strtime, tz, Timestamp};
 use reqwest::Client;
@@ -149,76 +149,49 @@ pub async fn upload_image(
         account.id
     ).execute(&state.pool).await?;
 
-    let medium_dimension = (
-        original_image.dimensions().0 / 2,
-        original_image.dimensions().1 / 2,
-    );
-    let small_dimension = (
-        original_image.dimensions().0 / 4,
-        original_image.dimensions().1 / 4,
-    );
-
-    let original_quality = 100;
-    let medium_quality = 80;
-    let small_quality = 80;
-
-    let medium_image = compress_image(&original_image, medium_dimension, medium_quality)?;
-    let small_image = compress_image(&original_image, small_dimension, small_quality)?;
-
+    // Generate object name for original only
     let object_name_original = get_object_name();
-    let object_name_medium = get_object_name();
-    let object_name_small = get_object_name();
 
+    // Insert original variant record
+    let original_quality = 100;
     query!(
         "INSERT INTO variant (id, object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
         Uuid::now_v7(), &object_name_original, dimensions.0 as i32, dimensions.1 as i32, original_quality, "original", 1 as i64, &image_id
     ).execute(&state.pool).await?;
-    query!(
-        "INSERT INTO variant (id, object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-        Uuid::now_v7(), &object_name_medium, medium_dimension.0 as i32, medium_dimension.1 as i32, medium_quality as i32, "medium", 1 as i64, &image_id
-    ).execute(&state.pool).await?;
-    query!(
-        "INSERT INTO variant (id, object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-        Uuid::now_v7(), &object_name_small, small_dimension.0 as i32, small_dimension.1 as i32, small_quality as i32, "small", 1 as i64, &image_id
-    ).execute(&state.pool).await?;
 
-    let [original_url, medium_url, small_url] = {
+    // Upload original image to S3
+    let original_url = {
         let bucket = state.bucket.lock().await;
-
-        let original = bucket.presign_put(&object_name_original, UPLOAD_LINK_TIMEOUT_SEC, None)?;
-        let medium = bucket.presign_put(&object_name_medium, UPLOAD_LINK_TIMEOUT_SEC, None)?;
-        let small = bucket.presign_put(&object_name_small, UPLOAD_LINK_TIMEOUT_SEC, None)?;
-
-        [original, medium, small]
+        bucket.presign_put(&object_name_original, UPLOAD_LINK_TIMEOUT_SEC, None)?
     };
 
     info!(
         filename,
         filesize_original = image_data.len(),
-        filesize_medium = medium_image.len(),
-        filesize_small = small_image.len(),
+        "Uploading original image only"
     );
 
     let client = Client::new();
-    let original_fut = client.put(original_url).body(image_data).send();
-    let medium_fut = client.put(medium_url).body(medium_image).send();
-    let small_fut = client.put(small_url).body(small_image).send();
-
-    let (original_res, medium_res, small_res) = join!(original_fut, medium_fut, small_fut);
+    let original_res = client.put(original_url).body(image_data).send().await;
 
     if let Err(e) = original_res {
         error!(message = "failed to upload original image", error = ?e);
         return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR));
     }
 
-    if let Err(e) = medium_res {
-        error!(message = "failed to upload medium image", error = ?e);
-        return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR));
-    }
+    // Queue background job for image processing
+    let job = ImageProcessingJob {
+        image_id,
+        account_id: account.id,
+        original_object_name: object_name_original,
+    };
 
-    if let Err(e) = small_res {
-        error!(message = "failed to upload small image", error = ?e);
-        return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR));
+    if let Err(e) = state.job_sender.send(job).await {
+        error!(message = "failed to queue image processing job", error = ?e);
+        // Don't fail the request - the original is uploaded successfully
+        warn!(message = "image processing will not occur due to queue failure");
+    } else {
+        info!(message = "queued image processing job", image_id = %image_id);
     }
 
     Ok(StatusCode::OK)

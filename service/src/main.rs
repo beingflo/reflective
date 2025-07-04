@@ -4,9 +4,11 @@ mod image;
 mod spa;
 mod tag;
 mod utils;
+mod worker;
 
 use std::sync::Arc;
 
+use async_channel::unbounded;
 use auth::{login, signup};
 use axum::{
     extract::DefaultBodyLimit,
@@ -24,11 +26,13 @@ use tag::{add_tags, remove_tags};
 use tokio::{signal, sync::Mutex};
 use tracing::{error, info};
 use utils::get_bucket;
+use worker::{start_workers, ImageProcessingJob};
 
 #[derive(Clone, Debug)]
 pub struct AppState {
     pool: Pool<Postgres>,
     bucket: Arc<Mutex<Bucket>>,
+    job_sender: async_channel::Sender<ImageProcessingJob>,
 }
 
 #[tokio::main]
@@ -54,6 +58,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!(message = "Migrations applied");
 
+    // Create job queue for async image processing
+    let (job_sender, job_receiver) = unbounded::<ImageProcessingJob>();
+
+    let state = AppState {
+        pool: pool.clone(),
+        bucket: Arc::new(Mutex::new(bucket)),
+        job_sender,
+    };
+
+    // Start background workers (default: 2 workers)
+    let worker_count = std::env::var("WORKER_COUNT")
+        .unwrap_or_else(|_| "1".to_string())
+        .parse::<usize>()
+        .unwrap_or(1);
+
+    start_workers(state.clone(), job_receiver, worker_count).await;
+    info!(message = "Started {} background workers", worker_count);
+
     let app = Router::new()
         .route("/api/auth/signup", post(signup))
         .route("/api/auth/login", post(login))
@@ -63,10 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/tags", post(add_tags))
         .route("/api/tags", delete(remove_tags))
         .fallback(static_handler)
-        .with_state(AppState {
-            pool,
-            bucket: Arc::new(Mutex::new(bucket)),
-        })
+        .with_state(state)
         .layer(DefaultBodyLimit::disable());
 
     let port = 3001;
