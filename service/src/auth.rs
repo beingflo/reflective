@@ -1,19 +1,24 @@
 use crate::{error::AppError, utils::get_auth_token};
 use axum::{
-    Json,
     extract::{FromRequestParts, State},
-    http::{StatusCode, request::Parts},
+    http::{request::Parts, StatusCode},
+    Json,
 };
-use axum_extra::extract::{CookieJar, cookie::Cookie};
+use axum_extra::extract::{
+    cookie::{self, Cookie},
+    CookieJar,
+};
 use bcrypt::{hash, verify};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, query, query_as};
+use time::Duration;
 use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::AppState;
 
 const BCRYPT_COST: u32 = 12;
+const SESSION_DURATION_DAYS: i64 = 30;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Account {
@@ -158,7 +163,10 @@ pub async fn login(
     let jar = jar.add(
         Cookie::build(("token", auth_token))
             .path("/")
-            .http_only(true),
+            .http_only(true)
+            .max_age(Duration::days(SESSION_DURATION_DAYS))
+            .secure(true)
+            .same_site(cookie::SameSite::Strict),
     );
 
     info!(message = "Account logged in");
