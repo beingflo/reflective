@@ -1,7 +1,11 @@
 use std::{collections::HashMap, io::Cursor, vec};
 
 use crate::{
-    auth::AuthenticatedAccount, error::AppError, utils::get_object_name, worker::ImageProcessingJob,
+    auth::AuthenticatedAccount, 
+    error::AppError, 
+    s3_utils::delete_s3_object,
+    utils::get_object_name, 
+    worker::ImageProcessingJob,
 };
 use axum::{
     extract::{Multipart, Path, Query, State},
@@ -182,7 +186,8 @@ pub async fn upload_image(
         // Rollback transaction
         tx.rollback().await?;
         // Delete uploaded S3 object
-        if let Err(delete_err) = delete_s3_object(&state, &object_name_original).await {
+        let bucket = state.bucket.lock().await;
+        if let Err(delete_err) = delete_s3_object(&bucket, &object_name_original).await {
             error!(message = "failed to cleanup S3 object after DB failure", error = ?delete_err);
         }
         return Err(AppError::DBError(e));
@@ -200,7 +205,8 @@ pub async fn upload_image(
         // Rollback transaction
         tx.rollback().await?;
         // Delete uploaded S3 object
-        if let Err(delete_err) = delete_s3_object(&state, &object_name_original).await {
+        let bucket = state.bucket.lock().await;
+        if let Err(delete_err) = delete_s3_object(&bucket, &object_name_original).await {
             error!(message = "failed to cleanup S3 object after DB failure", error = ?delete_err);
         }
         return Err(AppError::DBError(e));
@@ -218,7 +224,8 @@ pub async fn upload_image(
         // Rollback transaction
         tx.rollback().await?;
         // Delete uploaded S3 object
-        if let Err(delete_err) = delete_s3_object(&state, &object_name_original).await {
+        let bucket = state.bucket.lock().await;
+        if let Err(delete_err) = delete_s3_object(&bucket, &object_name_original).await {
             error!(message = "failed to cleanup S3 object after job queue failure", error = ?delete_err);
         }
         return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR));
@@ -408,21 +415,3 @@ async fn check_image_exists(
     return Err(AppError::Status(StatusCode::NOT_FOUND));
 }
 
-// Helper function to delete S3 objects during rollback
-async fn delete_s3_object(state: &AppState, object_name: &str) -> Result<(), AppError> {
-    let bucket = state.bucket.lock().await;
-
-    match bucket.delete_object(object_name).await {
-        Ok(_) => {
-            info!(
-                message = "successfully deleted S3 object during rollback",
-                object_name
-            );
-            Ok(())
-        }
-        Err(e) => {
-            error!(message = "failed to delete S3 object during rollback", object_name, error = ?e);
-            Err(AppError::S3Error(e))
-        }
-    }
-}

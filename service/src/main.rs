@@ -1,6 +1,7 @@
 mod auth;
 mod error;
 mod image;
+mod s3_utils;
 mod spa;
 mod tag;
 mod utils;

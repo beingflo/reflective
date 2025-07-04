@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::{
     error::AppError,
+    s3_utils::{cleanup_s3_objects, delete_s3_object, download_image_from_s3},
     utils::{compress_image, get_object_name},
     AppState,
 };
@@ -58,7 +59,7 @@ impl Worker {
 
     async fn process_image(&self, job: ImageProcessingJob) -> Result<(), AppError> {
         // Download the original image from S3
-        let original_data = self.download_image(&job.original_object_name).await?;
+        let original_data = download_image_from_s3(&self.s3_bucket, &job.original_object_name).await?;
         
         // Process the image
         let image = ImageReader::new(Cursor::new(&original_data))
@@ -100,7 +101,7 @@ impl Worker {
         if let Err(e) = small_res {
             error!("Failed to upload small image: {:?}", e);
             // Clean up medium image that was successfully uploaded
-            if let Err(cleanup_err) = self.delete_s3_object(&object_name_medium).await {
+            if let Err(cleanup_err) = delete_s3_object(&self.s3_bucket, &object_name_medium).await {
                 error!("Failed to cleanup medium image after small upload failure: {:?}", cleanup_err);
             }
             return Err(AppError::Status(axum::http::StatusCode::INTERNAL_SERVER_ERROR));
@@ -120,7 +121,7 @@ impl Worker {
             // Rollback transaction
             tx.rollback().await?;
             // Clean up uploaded S3 objects
-            if let Err(cleanup_err) = self.cleanup_s3_objects(&[&object_name_medium, &object_name_small]).await {
+            if let Err(cleanup_err) = cleanup_s3_objects(&self.s3_bucket, &[&object_name_medium, &object_name_small]).await {
                 error!("Failed to cleanup S3 objects after DB failure: {:?}", cleanup_err);
             }
             return Err(AppError::DBError(e));
@@ -137,7 +138,7 @@ impl Worker {
             // Rollback transaction
             tx.rollback().await?;
             // Clean up uploaded S3 objects
-            if let Err(cleanup_err) = self.cleanup_s3_objects(&[&object_name_medium, &object_name_small]).await {
+            if let Err(cleanup_err) = cleanup_s3_objects(&self.s3_bucket, &[&object_name_medium, &object_name_small]).await {
                 error!("Failed to cleanup S3 objects after DB failure: {:?}", cleanup_err);
             }
             return Err(AppError::DBError(e));
@@ -147,7 +148,7 @@ impl Worker {
         if let Err(e) = tx.commit().await {
             error!("Failed to commit transaction: {:?}", e);
             // Clean up uploaded S3 objects since commit failed
-            if let Err(cleanup_err) = self.cleanup_s3_objects(&[&object_name_medium, &object_name_small]).await {
+            if let Err(cleanup_err) = cleanup_s3_objects(&self.s3_bucket, &[&object_name_medium, &object_name_small]).await {
                 error!("Failed to cleanup S3 objects after commit failure: {:?}", cleanup_err);
             }
             return Err(AppError::DBError(e));
@@ -161,59 +162,6 @@ impl Worker {
         Ok(())
     }
 
-    async fn download_image(&self, object_name: &str) -> Result<Vec<u8>, AppError> {
-        let url = self.s3_bucket.presign_get(format!("/{}", object_name), 600, None)?;
-        
-        let client = Client::new();
-        let response = client.get(url).send().await?;
-        
-        if !response.status().is_success() {
-            error!("Failed to download image from S3: {}", response.status());
-            return Err(AppError::Status(axum::http::StatusCode::INTERNAL_SERVER_ERROR));
-        }
-
-        let data = response.bytes().await?;
-        Ok(data.to_vec())
-    }
-
-    // Helper function to delete a single S3 object
-    async fn delete_s3_object(&self, object_name: &str) -> Result<(), AppError> {
-        match self.s3_bucket.delete_object(object_name).await {
-            Ok(_) => {
-                info!(
-                    "Successfully deleted S3 object during rollback: {}",
-                    object_name
-                );
-                Ok(())
-            }
-            Err(e) => {
-                error!(
-                    "Failed to delete S3 object during rollback: {} - {:?}",
-                    object_name, e
-                );
-                Err(AppError::S3Error(e))
-            }
-        }
-    }
-
-    // Helper function to delete multiple S3 objects
-    async fn cleanup_s3_objects(&self, object_names: &[&str]) -> Result<(), AppError> {
-        let mut errors = Vec::new();
-        
-        for object_name in object_names {
-            if let Err(e) = self.delete_s3_object(object_name).await {
-                errors.push(format!("Failed to delete {}: {:?}", object_name, e));
-            }
-        }
-
-        if !errors.is_empty() {
-            error!("S3 cleanup errors: {}", errors.join(", "));
-            return Err(AppError::Status(axum::http::StatusCode::INTERNAL_SERVER_ERROR));
-        }
-
-        info!("Successfully cleaned up all S3 objects: {:?}", object_names);
-        Ok(())
-    }
 }
 
 pub async fn start_workers(
