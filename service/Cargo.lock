@@ -2231,6 +2231,7 @@ dependencies = [
  "kamadak-exif",
  "mime_guess",
  "rand",
+ "rayon",
  "reqwest",
  "rust-embed",
  "rust-s3",

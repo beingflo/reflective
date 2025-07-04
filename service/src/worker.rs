@@ -1,7 +1,7 @@
 use std::{io::Cursor, time::Duration};
 
 use async_channel::Receiver;
-use image::{ImageReader, GenericImageView};
+use image::{GenericImageView, ImageReader};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::{query, Pool, Postgres};
@@ -44,7 +44,7 @@ impl Worker {
 
     pub async fn run(&self) {
         info!("Starting image processing worker");
-        
+
         while let Ok(job) = self.receiver.recv().await {
             info!(
                 "Processing image job for image_id: {}, account_id: {}",
@@ -59,8 +59,9 @@ impl Worker {
 
     async fn process_image(&self, job: ImageProcessingJob) -> Result<(), AppError> {
         // Download the original image from S3
-        let original_data = download_image_from_s3(&self.s3_bucket, &job.original_object_name).await?;
-        
+        let original_data =
+            download_image_from_s3(&self.s3_bucket, &job.original_object_name).await?;
+
         // Process the image
         let image = ImageReader::new(Cursor::new(&original_data))
             .with_guessed_format()?
@@ -75,8 +76,22 @@ impl Worker {
         let medium_quality = 80;
         let small_quality = 80;
 
-        let medium_image = compress_image(&image, medium_dimension, medium_quality)?;
-        let small_image = compress_image(&image, small_dimension, small_quality)?;
+        // Run CPU-intensive compression on rayon thread pool to avoid blocking async runtime
+        let (medium_image, small_image) = tokio::task::spawn_blocking(move || {
+            // Use rayon's thread pool for CPU-intensive work
+            rayon::join(
+                || compress_image(&image, medium_dimension, medium_quality),
+                || compress_image(&image, small_dimension, small_quality),
+            )
+        })
+        .await
+        .map_err(|e| {
+            error!("Failed to spawn blocking compression task: {:?}", e);
+            AppError::Status(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+        })?;
+
+        let medium_image = medium_image?;
+        let small_image = small_image?;
 
         // Generate object names for variants
         let object_name_medium = get_object_name();
@@ -84,7 +99,7 @@ impl Worker {
 
         // Upload compressed variants to S3 first
         let client = Client::new();
-        
+
         let medium_url = self.s3_bucket.presign_put(&object_name_medium, 600, None)?;
         let small_url = self.s3_bucket.presign_put(&object_name_small, 600, None)?;
 
@@ -95,16 +110,23 @@ impl Worker {
 
         if let Err(e) = medium_res {
             error!("Failed to upload medium image: {:?}", e);
-            return Err(AppError::Status(axum::http::StatusCode::INTERNAL_SERVER_ERROR));
+            return Err(AppError::Status(
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            ));
         }
 
         if let Err(e) = small_res {
             error!("Failed to upload small image: {:?}", e);
             // Clean up medium image that was successfully uploaded
             if let Err(cleanup_err) = delete_s3_object(&self.s3_bucket, &object_name_medium).await {
-                error!("Failed to cleanup medium image after small upload failure: {:?}", cleanup_err);
+                error!(
+                    "Failed to cleanup medium image after small upload failure: {:?}",
+                    cleanup_err
+                );
             }
-            return Err(AppError::Status(axum::http::StatusCode::INTERNAL_SERVER_ERROR));
+            return Err(AppError::Status(
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            ));
         }
 
         // Start database transaction for atomic variant insertion
@@ -121,8 +143,14 @@ impl Worker {
             // Rollback transaction
             tx.rollback().await?;
             // Clean up uploaded S3 objects
-            if let Err(cleanup_err) = cleanup_s3_objects(&self.s3_bucket, &[&object_name_medium, &object_name_small]).await {
-                error!("Failed to cleanup S3 objects after DB failure: {:?}", cleanup_err);
+            if let Err(cleanup_err) =
+                cleanup_s3_objects(&self.s3_bucket, &[&object_name_medium, &object_name_small])
+                    .await
+            {
+                error!(
+                    "Failed to cleanup S3 objects after DB failure: {:?}",
+                    cleanup_err
+                );
             }
             return Err(AppError::DBError(e));
         }
@@ -138,8 +166,14 @@ impl Worker {
             // Rollback transaction
             tx.rollback().await?;
             // Clean up uploaded S3 objects
-            if let Err(cleanup_err) = cleanup_s3_objects(&self.s3_bucket, &[&object_name_medium, &object_name_small]).await {
-                error!("Failed to cleanup S3 objects after DB failure: {:?}", cleanup_err);
+            if let Err(cleanup_err) =
+                cleanup_s3_objects(&self.s3_bucket, &[&object_name_medium, &object_name_small])
+                    .await
+            {
+                error!(
+                    "Failed to cleanup S3 objects after DB failure: {:?}",
+                    cleanup_err
+                );
             }
             return Err(AppError::DBError(e));
         }
@@ -148,8 +182,14 @@ impl Worker {
         if let Err(e) = tx.commit().await {
             error!("Failed to commit transaction: {:?}", e);
             // Clean up uploaded S3 objects since commit failed
-            if let Err(cleanup_err) = cleanup_s3_objects(&self.s3_bucket, &[&object_name_medium, &object_name_small]).await {
-                error!("Failed to cleanup S3 objects after commit failure: {:?}", cleanup_err);
+            if let Err(cleanup_err) =
+                cleanup_s3_objects(&self.s3_bucket, &[&object_name_medium, &object_name_small])
+                    .await
+            {
+                error!(
+                    "Failed to cleanup S3 objects after commit failure: {:?}",
+                    cleanup_err
+                );
             }
             return Err(AppError::DBError(e));
         }
@@ -161,7 +201,6 @@ impl Worker {
 
         Ok(())
     }
-
 }
 
 pub async fn start_workers(
@@ -180,7 +219,7 @@ pub async fn start_workers(
         tokio::spawn(async move {
             info!("Starting worker {}", i);
             let worker = Worker::new(worker_receiver, worker_pool, worker_bucket);
-            
+
             // Add retry logic for worker failures
             loop {
                 worker.run().await;
