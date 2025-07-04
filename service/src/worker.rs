@@ -81,7 +81,7 @@ impl Worker {
         let object_name_medium = get_object_name();
         let object_name_small = get_object_name();
 
-        // Upload compressed variants to S3
+        // Upload compressed variants to S3 first
         let client = Client::new();
         
         let medium_url = self.s3_bucket.presign_put(&object_name_medium, 600, None)?;
@@ -99,19 +99,59 @@ impl Worker {
 
         if let Err(e) = small_res {
             error!("Failed to upload small image: {:?}", e);
+            // Clean up medium image that was successfully uploaded
+            if let Err(cleanup_err) = self.delete_s3_object(&object_name_medium).await {
+                error!("Failed to cleanup medium image after small upload failure: {:?}", cleanup_err);
+            }
             return Err(AppError::Status(axum::http::StatusCode::INTERNAL_SERVER_ERROR));
         }
 
-        // Update database with variant information
-        query!(
+        // Start database transaction for atomic variant insertion
+        let mut tx = self.pool.begin().await?;
+
+        // Insert medium variant record within transaction
+        let medium_insert_result = query!(
             "INSERT INTO variant (id, object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
             Uuid::now_v7(), &object_name_medium, medium_dimension.0 as i32, medium_dimension.1 as i32, medium_quality as i32, "medium", 1 as i64, &job.image_id
-        ).execute(&self.pool).await?;
+        ).execute(&mut *tx).await;
 
-        query!(
+        if let Err(e) = medium_insert_result {
+            error!("Failed to insert medium variant record: {:?}", e);
+            // Rollback transaction
+            tx.rollback().await?;
+            // Clean up uploaded S3 objects
+            if let Err(cleanup_err) = self.cleanup_s3_objects(&[&object_name_medium, &object_name_small]).await {
+                error!("Failed to cleanup S3 objects after DB failure: {:?}", cleanup_err);
+            }
+            return Err(AppError::DBError(e));
+        }
+
+        // Insert small variant record within transaction
+        let small_insert_result = query!(
             "INSERT INTO variant (id, object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
             Uuid::now_v7(), &object_name_small, small_dimension.0 as i32, small_dimension.1 as i32, small_quality as i32, "small", 1 as i64, &job.image_id
-        ).execute(&self.pool).await?;
+        ).execute(&mut *tx).await;
+
+        if let Err(e) = small_insert_result {
+            error!("Failed to insert small variant record: {:?}", e);
+            // Rollback transaction
+            tx.rollback().await?;
+            // Clean up uploaded S3 objects
+            if let Err(cleanup_err) = self.cleanup_s3_objects(&[&object_name_medium, &object_name_small]).await {
+                error!("Failed to cleanup S3 objects after DB failure: {:?}", cleanup_err);
+            }
+            return Err(AppError::DBError(e));
+        }
+
+        // Commit transaction - everything succeeded
+        if let Err(e) = tx.commit().await {
+            error!("Failed to commit transaction: {:?}", e);
+            // Clean up uploaded S3 objects since commit failed
+            if let Err(cleanup_err) = self.cleanup_s3_objects(&[&object_name_medium, &object_name_small]).await {
+                error!("Failed to cleanup S3 objects after commit failure: {:?}", cleanup_err);
+            }
+            return Err(AppError::DBError(e));
+        }
 
         info!(
             "Successfully processed image variants for image_id: {}",
@@ -134,6 +174,45 @@ impl Worker {
 
         let data = response.bytes().await?;
         Ok(data.to_vec())
+    }
+
+    // Helper function to delete a single S3 object
+    async fn delete_s3_object(&self, object_name: &str) -> Result<(), AppError> {
+        match self.s3_bucket.delete_object(object_name).await {
+            Ok(_) => {
+                info!(
+                    "Successfully deleted S3 object during rollback: {}",
+                    object_name
+                );
+                Ok(())
+            }
+            Err(e) => {
+                error!(
+                    "Failed to delete S3 object during rollback: {} - {:?}",
+                    object_name, e
+                );
+                Err(AppError::S3Error(e))
+            }
+        }
+    }
+
+    // Helper function to delete multiple S3 objects
+    async fn cleanup_s3_objects(&self, object_names: &[&str]) -> Result<(), AppError> {
+        let mut errors = Vec::new();
+        
+        for object_name in object_names {
+            if let Err(e) = self.delete_s3_object(object_name).await {
+                errors.push(format!("Failed to delete {}: {:?}", object_name, e));
+            }
+        }
+
+        if !errors.is_empty() {
+            error!("S3 cleanup errors: {}", errors.join(", "));
+            return Err(AppError::Status(axum::http::StatusCode::INTERNAL_SERVER_ERROR));
+        }
+
+        info!("Successfully cleaned up all S3 objects: {:?}", object_names);
+        Ok(())
     }
 }
 
