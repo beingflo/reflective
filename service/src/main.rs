@@ -69,9 +69,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Start background workers (default: 2 workers)
     let worker_count = std::env::var("WORKER_COUNT")
-        .unwrap_or_else(|_| "1".to_string())
+        .unwrap_or_else(|_| "4".to_string())
         .parse::<usize>()
-        .unwrap_or(1);
+        .unwrap_or(4);
 
     start_workers(state.clone(), job_receiver, worker_count).await;
     info!(message = "Started {} background workers", worker_count);
