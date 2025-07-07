@@ -20,12 +20,17 @@ use axum::{
 use dotenv::dotenv;
 use error::AppError;
 use image::{get_image, search_images, upload_image};
+use opentelemetry::{global, trace::TracerProvider};
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::trace::SdkTracerProvider;
 use s3::Bucket;
 use spa::static_handler;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use tag::{add_tags, remove_tags};
 use tokio::{signal, sync::Mutex};
 use tracing::{error, info};
+use tracing_opentelemetry::OpenTelemetryLayer;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utils::get_bucket;
 use worker::{start_workers, ImageProcessingJob};
 
@@ -39,8 +44,26 @@ pub struct AppState {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
-    let subscriber = tracing_subscriber::fmt().finish();
-    tracing::subscriber::set_global_default(subscriber)?;
+
+    // Initialize OpenTelemetry OTLP exporter
+    let tracer = opentelemetry_otlp::SpanExporter::builder()
+        .with_http()
+        .with_endpoint("http://localhost:4318/")
+        .build()?;
+
+    let provider = SdkTracerProvider::builder()
+        .with_batch_exporter(tracer)
+        .build();
+
+    global::set_tracer_provider(provider.clone());
+
+    // Set up tracing with both console output and OpenTelemetry
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(OpenTelemetryLayer::new(
+            provider.tracer("reflective-service"),
+        ))
+        .init();
 
     info!(message = "Starting application");
 
@@ -101,6 +124,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             error!(message = "Failed to start server", error=%e);
             AppError::Status(StatusCode::SERVICE_UNAVAILABLE)
         })?;
+
+    // Shutdown OpenTelemetry to flush remaining traces
+    provider.shutdown()?;
 
     Ok(())
 }
