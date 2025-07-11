@@ -1,11 +1,8 @@
 use std::{collections::HashMap, io::Cursor, vec};
 
 use crate::{
-    auth::AuthenticatedAccount, 
-    error::AppError, 
-    s3_utils::delete_s3_object,
-    utils::get_object_name, 
-    worker::ImageProcessingJob,
+    auth::AuthenticatedAccount, error::AppError, s3_utils::delete_s3_object,
+    utils::get_object_name, worker::ImageProcessingJob,
 };
 use axum::{
     extract::{Multipart, Path, Query, State},
@@ -414,4 +411,3 @@ async fn check_image_exists(
 
     return Err(AppError::Status(StatusCode::NOT_FOUND));
 }
-
