@@ -41,7 +41,7 @@ pub struct AuthenticatedAccount {
 impl FromRequestParts<AppState> for AuthenticatedAccount {
     type Rejection = AppError;
 
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip_all, name = "authenticate_user")]
     async fn from_request_parts(
         parts: &mut Parts,
         state: &AppState,

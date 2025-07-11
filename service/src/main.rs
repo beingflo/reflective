@@ -115,7 +115,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/tags", delete(remove_tags))
         .fallback(static_handler)
         .with_state(state)
-        .layer(TraceLayer::new_for_http())
+        .layer(TraceLayer::new_for_http().make_span_with(
+            |request: &axum::http::Request<axum::body::Body>| {
+                tracing::info_span!(
+                    "http_request",
+                    method = %request.method(),
+                    uri = %request.uri(),
+                    version = ?request.version(),
+                )
+            },
+        ))
         .layer(DefaultBodyLimit::disable());
 
     let port = 3001;
