@@ -28,6 +28,7 @@ use spa::static_handler;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use tag::{add_tags, remove_tags};
 use tokio::{signal, sync::Mutex};
+use tower_http::trace::TraceLayer;
 use tracing::{error, info};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
@@ -59,10 +60,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Set up tracing with both console output and OpenTelemetry
     tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_filter(tracing_subscriber::filter::LevelFilter::WARN))
-        .with(OpenTelemetryLayer::new(
-            provider.tracer("reflective-service"),
-        ).with_filter(tracing_subscriber::filter::LevelFilter::INFO))
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_filter(tracing_subscriber::filter::LevelFilter::WARN),
+        )
+        .with(
+            OpenTelemetryLayer::new(provider.tracer("reflective-service"))
+                .with_filter(tracing_subscriber::filter::LevelFilter::INFO),
+        )
         .init();
 
     info!(message = "Starting application");
@@ -110,6 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/tags", delete(remove_tags))
         .fallback(static_handler)
         .with_state(state)
+        .layer(TraceLayer::new_for_http())
         .layer(DefaultBodyLimit::disable());
 
     let port = 3001;
