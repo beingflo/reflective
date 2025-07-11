@@ -21,7 +21,7 @@ use dotenv::dotenv;
 use error::AppError;
 use image::{get_image, search_images, upload_image};
 use opentelemetry::{global, trace::TracerProvider};
-use opentelemetry_otlp::{WithExportConfig, WithHttpConfig};
+use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use s3::Bucket;
 use spa::static_handler;
@@ -30,7 +30,7 @@ use tag::{add_tags, remove_tags};
 use tokio::{signal, sync::Mutex};
 use tracing::{error, info};
 use tracing_opentelemetry::OpenTelemetryLayer;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 use utils::get_bucket;
 use worker::{start_workers, ImageProcessingJob};
 
@@ -59,10 +59,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Set up tracing with both console output and OpenTelemetry
     tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().with_filter(tracing_subscriber::filter::LevelFilter::WARN))
         .with(OpenTelemetryLayer::new(
             provider.tracer("reflective-service"),
-        ))
+        ).with_filter(tracing_subscriber::filter::LevelFilter::INFO))
         .init();
 
     info!(message = "Starting application");
