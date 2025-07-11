@@ -49,14 +49,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tracer = opentelemetry_otlp::SpanExporter::builder()
         .with_http()
         .with_endpoint("http://localhost:4318/v1/traces")
-        .with_headers(
-            [(
-                "authorization".to_string(),
-                "2cd6eb32-28c5-4aee-a1f8-144f5634f1f3".to_string(),
-            )]
-            .into_iter()
-            .collect(),
-        )
         .build()?;
 
     let provider = SdkTracerProvider::builder()
