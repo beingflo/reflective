@@ -7,13 +7,14 @@ mod tag;
 mod utils;
 mod worker;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use async_channel::unbounded;
 use auth::{login, signup};
 use axum::{
+    body::Body,
     extract::DefaultBodyLimit,
-    http::StatusCode,
+    http::{Request, Response, StatusCode},
     routing::{delete, get, post},
     Router,
 };
@@ -28,11 +29,12 @@ use spa::static_handler;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use tag::{add_tags, remove_tags};
 use tokio::{signal, sync::Mutex};
-use tower_http::trace::TraceLayer;
-use tracing::{error, info};
+use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
+use tracing::{error, info, Span};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 use utils::get_bucket;
+use uuid::Uuid;
 use worker::{start_workers, ImageProcessingJob};
 
 #[derive(Clone, Debug)]
@@ -115,16 +117,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/tags", delete(remove_tags))
         .fallback(static_handler)
         .with_state(state)
-        .layer(TraceLayer::new_for_http().make_span_with(
-            |request: &axum::http::Request<axum::body::Body>| {
-                tracing::info_span!(
-                    "http_request",
-                    method = %request.method(),
-                    uri = %request.uri(),
-                    version = ?request.version(),
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(|_request: &Request<Body>| {
+                    let request_id = Uuid::new_v4().to_string();
+                    tracing::info_span!("http-request", %request_id)
+                })
+                .on_request(|request: &Request<Body>, _span: &Span| {
+                    info!(
+                        message = "request",
+                        request = request.method().as_str(),
+                        uri = request.uri().path().to_string()
+                    )
+                })
+                .on_response(
+                    |response: &Response<Body>, latency: Duration, _span: &Span| {
+                        info!(
+                            message = "response_status",
+                            status = response.status().as_u16(),
+                            latency = latency.as_nanos()
+                        )
+                    },
                 )
-            },
-        ))
+                .on_failure(
+                    |error: ServerErrorsFailureClass, _latency: Duration, _span: &Span| {
+                        error!(message = "error", error = error.to_string())
+                    },
+                ),
+        )
         .layer(DefaultBodyLimit::disable());
 
     let port = 3001;
