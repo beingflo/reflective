@@ -40,7 +40,7 @@ pub enum AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        error!(message = "app error", error = %self);
+        error!(message = "Error", error = %self);
 
         match self {
             AppError::Status(code) => code.into_response(),

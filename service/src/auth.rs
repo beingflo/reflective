@@ -12,7 +12,7 @@ use bcrypt::{hash, verify};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, query, query_as};
 use time::Duration;
-use tracing::{error, info};
+use tracing::{error, info, Span};
 use uuid::Uuid;
 
 use crate::AppState;
@@ -41,7 +41,7 @@ pub struct AuthenticatedAccount {
 impl FromRequestParts<AppState> for AuthenticatedAccount {
     type Rejection = AppError;
 
-    #[tracing::instrument(skip_all, name = "authenticate_user")]
+    #[tracing::instrument(skip_all, name = "authenticate_user", fields(user_id, username))]
     async fn from_request_parts(
         parts: &mut Parts,
         state: &AppState,
@@ -75,6 +75,9 @@ impl FromRequestParts<AppState> for AuthenticatedAccount {
             error!(message = "No account found for token");
             return Err(AppError::Status(StatusCode::UNAUTHORIZED));
         };
+
+        Span::current().record("user_id", account.id.to_string());
+        Span::current().record("username", account.username.to_string());
 
         Ok(AuthenticatedAccount {
             id: account.id,
