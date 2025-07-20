@@ -7,7 +7,7 @@ mod tag;
 mod utils;
 mod worker;
 
-use std::{sync::Arc, time::Duration};
+use std::{env, sync::Arc, time::Duration};
 
 use async_channel::unbounded;
 use auth::{login, signup};
@@ -22,7 +22,6 @@ use dotenv::dotenv;
 use error::AppError;
 use image::{get_image, search_images, upload_image};
 use opentelemetry::{global, trace::TracerProvider};
-use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use s3::Bucket;
 use spa::static_handler;
@@ -51,7 +50,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize OpenTelemetry OTLP exporter
     let tracer = opentelemetry_otlp::SpanExporter::builder()
         .with_http()
-        .with_endpoint("http://localhost:4318/v1/traces")
         .build()?;
 
     let provider = SdkTracerProvider::builder()
@@ -64,7 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::layer()
-                .with_filter(tracing_subscriber::filter::LevelFilter::WARN),
+                .with_filter(tracing_subscriber::filter::LevelFilter::INFO),
         )
         .with(
             OpenTelemetryLayer::new(provider.tracer("reflective-service"))
@@ -107,6 +105,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     start_workers(state.clone(), job_receiver, worker_count).await;
     info!(message = "Started {} background workers", worker_count);
 
+    let Some((_, port)) = env::vars().find(|v| v.0.eq("SERVE_PORT")) else {
+        error!("Port not present in environment");
+        panic!()
+    };
+
     let app = Router::new()
         .route("/api/auth/signup", post(signup))
         .route("/api/auth/login", post(login))
@@ -127,7 +130,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     info!(
                         message = "request",
                         request = request.method().as_str(),
-                        uri = request.uri().path().to_string()
+                        uri = request.uri().path().to_string(),
+                        referrer = request
+                            .headers()
+                            .get("referer")
+                            .and_then(|v| v.to_str().ok())
+                            .unwrap_or(""),
+                        user_agent = request
+                            .headers()
+                            .get("user-agent")
+                            .and_then(|v| v.to_str().ok())
+                            .unwrap_or("")
                     )
                 })
                 .on_response(
@@ -147,7 +160,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .layer(DefaultBodyLimit::disable());
 
-    let port = 3001;
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
 
     info!(message = "Starting server", port);
