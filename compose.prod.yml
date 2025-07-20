@@ -44,7 +44,7 @@ networks:
   reflective_net:
     name: reflective_net
   events_net:
-    name: events_net
+    external: true
 
 volumes:
   reflective-pg:
