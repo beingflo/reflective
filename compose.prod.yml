@@ -16,10 +16,7 @@ services:
   reflective-db:
     image: postgres:latest
     container_name: reflective-db
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: reflective
+    env_file: ".env.prod"
     networks:
       - reflective_net
     ports:
