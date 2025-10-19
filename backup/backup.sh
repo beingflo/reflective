@@ -47,3 +47,5 @@ END=$(date +%s)
 
 echo "Backup complete."
 echo "Start: ${START}, END: ${END}, SIZE: ${SIZE}"
+
+wget --timeout=10 --tries=6 -O /dev/null https://pulse.updown.io/${UPDOWN_BACKUP_PULSE}
