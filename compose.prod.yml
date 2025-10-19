@@ -25,13 +25,14 @@ services:
       - reflective-pg:/var/lib/postgresql/data/
     restart: unless-stopped
 
-  pg_backup_s3:
-    image: "ghcr.io/beingflo/postgres-backup-s3:1.2"
+  pg_backup:
     container_name: reflective-backup
+    build:
+      dockerfile: ./backup/Dockerfile
     restart: unless-stopped
+    env_file: ".env.prod"
     depends_on:
       - reflective-db
-    env_file: ".env.prod"
     networks:
       - reflective_net
 

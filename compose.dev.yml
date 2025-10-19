@@ -1,0 +1,13 @@
+services:
+  pg_backup:
+    container_name: reflective-backup
+    build:
+      dockerfile: ./backup/Dockerfile
+    restart: unless-stopped
+    env_file: ".env"
+    networks:
+      - reflective_net
+
+networks:
+  reflective_net:
+    name: reflective_net
