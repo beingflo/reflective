@@ -1,8 +1,9 @@
-use std::{collections::HashMap, io::Cursor, vec};
+use std::{collections::HashMap, env, fs, io::Cursor, vec};
 
 use crate::{
-    auth::AuthenticatedAccount, error::AppError, s3_utils::delete_s3_object,
-    utils::get_object_name, worker::ImageProcessingJob,
+    auth::AuthenticatedAccount,
+    error::AppError,
+    utils::{compress_image, get_object_name},
 };
 use axum::{
     extract::{Multipart, Path, Query, State},
@@ -10,77 +11,266 @@ use axum::{
     response::Redirect,
     Json,
 };
+use exif::Exif;
 use image::{GenericImageView, ImageDecoder, ImageReader};
 use jiff::{fmt::strtime, tz, Timestamp};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, FromRow, Pool, Postgres};
+use tokio::time::{interval, Duration};
 use tracing::{error, info, trace, warn};
 use uuid::Uuid;
+use walkdir::{DirEntry, WalkDir};
 
 use crate::AppState;
 
-const UPLOAD_LINK_TIMEOUT_SEC: u32 = 600;
+#[tracing::instrument(skip_all)]
+pub async fn scan_disk(state: AppState) -> Result<(), AppError> {
+    let mut interval = interval(Duration::from_secs(60));
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
-#[tracing::instrument(skip_all, fields(
-    username = %account.username,
-))]
-#[axum::debug_handler]
-pub async fn upload_image(
-    account: AuthenticatedAccount,
-    State(state): State<AppState>,
-    mut multipart: Multipart,
-) -> Result<StatusCode, AppError> {
-    let mut filename: Option<String> = None;
-    let mut image_data: Option<Vec<u8>> = None;
-    let mut last_modified: Option<String> = None;
+    loop {
+        interval.tick().await;
+        info!(message = "Starting scan for new images");
+        verify_images(&state).await?;
+    }
+}
 
-    while let Some(field) = multipart.next_field().await? {
-        match field.name() {
-            Some("filename") => {
-                filename = Some(field.text().await?);
+#[tracing::instrument(skip_all)]
+pub async fn verify_images(state: &AppState) -> Result<(), AppError> {
+    let images_dir = std::env::var("IMAGE_DIR").expect("IMAGE_DIR must be set");
+
+    let mut files = Vec::new();
+
+    for entry in WalkDir::new(images_dir).into_iter().filter_map(|e| e.ok()) {
+        if entry.file_type().is_file() {
+            files.push(entry);
+        }
+    }
+
+    // For each image check that
+    // - the image is in the DB
+    // - all variants exist
+    for file in files {
+        // Is image in image table
+        let image_id = match image_indexed(state, &file).await {
+            Ok(Some(id)) => id,
+            Ok(None) => {
+                if let Ok(id) = add_image(state, &file).await {
+                    id
+                } else {
+                    error!(message="indexing image failed", file_name=%file.file_name().to_str().unwrap());
+                    continue;
+                }
             }
-            Some("last_modified") => {
-                last_modified = Some(field.text().await?);
+            Err(error) => {
+                error!(message="indexing image failed", file_name=%file.file_name().to_str().unwrap(), %error);
+                continue;
             }
-            Some("data") => {
-                let data = field.bytes().await?;
-                image_data = Some(data.to_vec());
+        };
+
+        match index_compressed_image(state, image_id, &file, 2.0, "medium").await {
+            Ok(_) => {}
+            Err(error) => {
+                error!(message="indexing compressed image failed", file_name=%file.file_name().to_str().unwrap(), %error);
             }
-            Some(name) => {
-                error!(message = "unknown field in multipart body", name);
-                return Err(AppError::Status(StatusCode::BAD_REQUEST));
-            }
-            _ => {
-                error!(message = "field in multipart body with no name");
-                return Err(AppError::Status(StatusCode::BAD_REQUEST));
+        }
+        match index_compressed_image(state, image_id, &file, 4.0, "small").await {
+            Ok(_) => {}
+            Err(error) => {
+                error!(message="indexing compressed image failed", file_name=%file.file_name().to_str().unwrap(), %error);
             }
         }
     }
 
-    if filename.is_none() || last_modified.is_none() || image_data.is_none() {
-        error!(message = "missing field in multipart body");
-        return Err(AppError::Status(StatusCode::BAD_REQUEST));
+    Ok(())
+}
+
+async fn index_compressed_image(
+    state: &AppState,
+    image_id: Uuid,
+    file: &DirEntry,
+    dimension_reduction: f32,
+    quality: &str,
+) -> Result<(), AppError> {
+    #[derive(FromRow)]
+    struct Variant {
+        object_name: String,
     }
 
-    let Some(filename) = filename else {
-        unreachable!()
-    };
-    let Some(last_modified) = last_modified else {
-        unreachable!()
-    };
-    let Some(image_data) = image_data else {
-        unreachable!()
+    let result = query_as!(
+        Variant,
+        "
+            SELECT variant.object_name
+            FROM variant INNER JOIN image ON variant.image_id = image.id
+            WHERE image.id = $1 AND variant.quality = $2;
+        ",
+        image_id,
+        quality
+    )
+    .fetch_optional(&state.pool)
+    .await?;
+
+    let mut tx = state.pool.begin().await?;
+
+    let object_name = match result {
+        None => {
+            info!(message = "variant is not indexed", %quality, image_id = %image_id);
+
+            let image = ImageReader::open(file.path())?.with_guessed_format()?;
+            let original_image = image.decode()?;
+
+            let dimensions = original_image.dimensions();
+
+            let object_name = get_object_name();
+            let variant_insert_result = query!(
+                    "INSERT INTO variant (id, object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                    Uuid::now_v7(), &object_name, (dimensions.0 as f32 / dimension_reduction as f32) as i32, (dimensions.1 as f32 / dimension_reduction as f32) as i32, 80, quality, 1 as i64, &image_id
+                ).execute(&mut *tx).await;
+
+            if let Err(e) = variant_insert_result {
+                error!(message = "failed to insert variant record", error = ?e);
+                // Rollback transaction
+                tx.rollback().await?;
+                return Err(AppError::DBError(e));
+            }
+            object_name
+        }
+        Some(variant) => variant.object_name,
     };
 
-    info!(message = "uploading image", filename);
+    let caches_dir = std::env::var("IMAGE_CACHE_DIR").expect("IMAGE_CACHE_DIR must be set");
+    let caches_dir = std::path::Path::new(&caches_dir);
 
-    let image = ImageReader::new(Cursor::new(&image_data)).with_guessed_format()?;
+    let file_path = caches_dir.join(object_name);
+    if file_path.exists() && file_path.is_file() {
+        return Ok(());
+    }
+
+    info!(message = "variant file does not exist", %quality, image_id = %image_id);
+
+    let image = ImageReader::open(file.path())?.with_guessed_format()?;
+    let original_image = image.decode()?;
+
+    let dimensions = original_image.dimensions();
+    let width = (dimensions.0 as f32 / dimension_reduction as f32) as u32;
+    let height = (dimensions.1 as f32 / dimension_reduction as f32) as u32;
+
+    let compressed_image = compress_image(&original_image, (width, height), 80)?;
+    fs::write(file_path, &compressed_image)?;
+
+    tx.commit().await?;
+
+    Ok(())
+}
+
+async fn add_image(state: &AppState, file: &DirEntry) -> Result<Uuid, AppError> {
+    let image_id = Uuid::now_v7();
+
+    let image = ImageReader::open(file.path())?.with_guessed_format()?;
+    let original_image = image.decode()?;
+
+    let dimensions = original_image.dimensions();
+    let aspect_ratio = dimensions.0 as f64 / dimensions.1 as f64;
+
+    // Generate object name for original
+    let object_name_original = get_object_name();
+
+    let mut tx = state.pool.begin().await?;
+
+    let (captured_at, exif) = get_capture_timestamp(&file)?;
+
+    // Insert image record within transaction
+    let image_insert_result = query!(
+                    "INSERT INTO image (id, filename, captured_at, aspect_ratio, metadata) VALUES ($1, $2, $3, $4, $5);",
+                    image_id,
+                    file.file_name().to_str(),
+                    captured_at,
+                    aspect_ratio,
+                    serde_json::to_string(&exif)?,
+                ).execute(&mut *tx).await;
+
+    if let Err(e) = image_insert_result {
+        error!(message = "failed to insert image record", error = ?e);
+        // Rollback transaction
+        tx.rollback().await?;
+        return Err(AppError::DBError(e));
+    }
+
+    // Insert original variant record within transaction
+    let original_quality = 100;
+    let variant_insert_result = query!(
+                    "INSERT INTO variant (id, object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                    Uuid::now_v7(), &object_name_original, dimensions.0 as i32, dimensions.1 as i32, original_quality, "original", 1 as i64, &image_id
+                ).execute(&mut *tx).await;
+
+    if let Err(e) = variant_insert_result {
+        error!(message = "failed to insert variant record", error = ?e);
+        // Rollback transaction
+        tx.rollback().await?;
+        return Err(AppError::DBError(e));
+    }
+
+    // Commit transaction - everything succeeded
+    tx.commit().await?;
+    info!(message = "inserted image into DB", image_id = %image_id);
+
+    Ok(image_id)
+}
+
+async fn image_indexed(state: &AppState, file: &DirEntry) -> Result<Option<Uuid>, AppError> {
+    let (captured_at, _) = get_capture_timestamp(&file)?;
+
+    #[derive(FromRow)]
+    struct File {
+        id: Uuid,
+    }
+
+    let result = query_as!(
+        File,
+        "
+            SELECT id 
+            FROM image
+            WHERE filename = $1 AND captured_at = $2;
+        ",
+        file.file_name().to_str(),
+        captured_at
+    )
+    .fetch_optional(&state.pool)
+    .await?;
+
+    if let Some(file) = result {
+        return Ok(Some(file.id));
+    };
+
+    info!(message = "image is not indexed", file = %file.file_name()
+        .to_str()
+        .expect("file name not unicode"));
+
+    Ok(None)
+}
+
+fn get_capture_timestamp(file: &DirEntry) -> Result<(String, HashMap<String, String>), AppError> {
+    let last_modified = file.metadata()?.modified()?;
+    let exif = extract_exif(&file)?;
+    let timestamp;
+
+    if let Some(captured_at) = exif.get("DateTimeOriginal") {
+        let mut captured_at = strtime::parse("%Y-%m-%d %H:%M:%S", captured_at)?;
+        captured_at.set_offset(Some(tz::offset(0)));
+        timestamp = captured_at.to_timestamp()?.to_string();
+    } else {
+        let ts: Timestamp = last_modified.try_into()?;
+        timestamp = ts.to_string();
+    }
+
+    Ok((timestamp, exif))
+}
+
+fn extract_exif(file: &DirEntry) -> Result<HashMap<String, String>, AppError> {
+    let image = ImageReader::open(file.path())?.with_guessed_format()?;
     let mut exif_map = HashMap::new();
-    let exif = ImageReader::new(Cursor::new(&image_data))
-        .with_guessed_format()?
-        .into_decoder()?
-        .exif_metadata()?;
+    let exif = image.into_decoder()?.exif_metadata()?;
 
     if let Some(exif) = exif {
         let exif_reader = exif::Reader::new();
@@ -91,148 +281,7 @@ pub async fn upload_image(
         }
     }
 
-    #[derive(FromRow)]
-    struct File {
-        filename: String,
-    }
-
-    let image_id = Uuid::now_v7();
-
-    let timestamp;
-
-    if let Some(captured_at) = exif_map.get("DateTimeOriginal") {
-        let mut captured_at = strtime::parse("%Y-%m-%d %H:%M:%S", captured_at)?;
-        captured_at.set_offset(Some(tz::offset(0)));
-        timestamp = captured_at.to_timestamp()?.to_string();
-    } else {
-        timestamp = Timestamp::from_millisecond(
-            last_modified
-                .parse()
-                .unwrap_or(Timestamp::now().as_millisecond()),
-        )?
-        .to_string();
-    }
-
-    let result = query_as!(
-        File,
-        "
-            SELECT filename 
-            FROM image
-            WHERE account_id = $1 AND filename = $2 AND captured_at = $3;
-        ",
-        account.id,
-        filename,
-        timestamp
-    )
-    .fetch_optional(&state.pool)
-    .await?;
-
-    if let Some(file) = result {
-        error!(message = "image already exists", file = %file.filename);
-        return Err(AppError::Status(StatusCode::CONFLICT));
-    };
-
-    let original_image = image.decode()?;
-
-    let dimensions = original_image.dimensions();
-    let aspect_ratio = dimensions.0 as f64 / dimensions.1 as f64;
-
-    // Generate object name for original
-    let object_name_original = get_object_name();
-
-    // Upload original image to S3 first (before any DB operations)
-    let original_url = {
-        let bucket = state.bucket.lock().await;
-        bucket.presign_put(&object_name_original, UPLOAD_LINK_TIMEOUT_SEC, None)?
-    };
-
-    info!(
-        filename,
-        filesize_original = image_data.len(),
-        "Uploading original image"
-    );
-
-    let client = Client::new();
-    let original_res = client
-        .put(original_url)
-        .body(image_data.clone())
-        .send()
-        .await;
-
-    if let Err(e) = original_res {
-        error!(message = "failed to upload original image", error = ?e);
-        return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR));
-    }
-
-    // Start database transaction
-    let mut tx = state.pool.begin().await?;
-
-    // Insert image record within transaction
-    let image_insert_result = query!(
-        "INSERT INTO image (id, filename, captured_at, aspect_ratio, metadata, account_id) VALUES ($1, $2, $3, $4, $5, $6);",
-        image_id,
-        filename,
-        timestamp,
-        aspect_ratio,
-        serde_json::to_string(&exif_map)?,
-        account.id
-    ).execute(&mut *tx).await;
-
-    if let Err(e) = image_insert_result {
-        error!(message = "failed to insert image record", error = ?e);
-        // Rollback transaction
-        tx.rollback().await?;
-        // Delete uploaded S3 object
-        let bucket = state.bucket.lock().await;
-        if let Err(delete_err) = delete_s3_object(&bucket, &object_name_original).await {
-            error!(message = "failed to cleanup S3 object after DB failure", error = ?delete_err);
-        }
-        return Err(AppError::DBError(e));
-    }
-
-    // Insert original variant record within transaction
-    let original_quality = 100;
-    let variant_insert_result = query!(
-        "INSERT INTO variant (id, object_name, width, height, compression_quality, quality, version, image_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-        Uuid::now_v7(), &object_name_original, dimensions.0 as i32, dimensions.1 as i32, original_quality, "original", 1 as i64, &image_id
-    ).execute(&mut *tx).await;
-
-    if let Err(e) = variant_insert_result {
-        error!(message = "failed to insert variant record", error = ?e);
-        // Rollback transaction
-        tx.rollback().await?;
-        // Delete uploaded S3 object
-        let bucket = state.bucket.lock().await;
-        if let Err(delete_err) = delete_s3_object(&bucket, &object_name_original).await {
-            error!(message = "failed to cleanup S3 object after DB failure", error = ?delete_err);
-        }
-        return Err(AppError::DBError(e));
-    }
-
-    // Queue background job for image processing
-    let job = ImageProcessingJob {
-        image_id,
-        account_id: account.id,
-        original_object_name: object_name_original.clone(),
-    };
-
-    if let Err(e) = state.job_sender.send(job).await {
-        error!(message = "failed to queue image processing job", error = ?e);
-        // Rollback transaction
-        tx.rollback().await?;
-        // Delete uploaded S3 object
-        let bucket = state.bucket.lock().await;
-        if let Err(delete_err) = delete_s3_object(&bucket, &object_name_original).await {
-            error!(message = "failed to cleanup S3 object after job queue failure", error = ?delete_err);
-        }
-        return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR));
-    }
-
-    // Commit transaction - everything succeeded
-    tx.commit().await?;
-    info!(message = "successfully uploaded image and queued processing job", image_id = %image_id);
-
-    Ok(StatusCode::OK)
+    Ok(exif_map)
 }
 
 #[derive(Serialize, FromRow)]
@@ -266,10 +315,8 @@ pub async fn search_images(
         Tag,
         "
             SELECT tag.id, tag.description
-            FROM tag
-            WHERE tag.account_id = $1;
+            FROM tag;
         ",
-        account.id,
     )
     .fetch_all(&state.pool)
     .await?;
@@ -305,11 +352,9 @@ pub async fn search_images(
             FROM image
             LEFT JOIN image_tag ON image.id = image_tag.image_id
             LEFT JOIN tag ON image_tag.tag_id = tag.id
-            WHERE image.account_id = $1
             GROUP BY image.id
-            HAVING ARRAY_AGG(tag_id::text) @> ARRAY[$2::text[]];
+            HAVING ARRAY_AGG(tag_id::text) @> ARRAY[$1::text[]];
         ",
-        account.id,
         &tags.iter().map(|tag| tag.id.to_string()).collect::<Vec<_>>()
     )
     .fetch_all(&state.pool)
@@ -327,54 +372,35 @@ pub struct QueryParams {
     quality: String,
 }
 
-#[tracing::instrument(skip_all, fields(
-    username = %account.username,
-    id = %id,
-    quality = %params.quality
-))]
-pub async fn get_image(
-    account: AuthenticatedAccount,
-    Path(id): Path<Uuid>,
-    params: Query<QueryParams>,
-    State(state): State<AppState>,
-) -> Result<Redirect, AppError> {
-    info!(message = "get image");
+// #[tracing::instrument(skip_all, fields(
+//     username = %account.username,
+//     id = %id,
+//     quality = %params.quality
+// ))]
+// pub async fn get_image(
+//     account: AuthenticatedAccount,
+//     Path(id): Path<Uuid>,
+//     params: Query<QueryParams>,
+//     State(state): State<AppState>,
+// ) -> Result<Redirect, AppError> {
+//     info!(message = "get image");
 
-    check_image_exists(&state.pool, account.id, id).await?;
+//     check_image_exists(&state.pool, account.id, id).await?;
 
-    #[derive(FromRow)]
-    struct Variant {
-        object_name: String,
-    }
+//     let bucket = state.bucket.lock().await;
 
-    let result = query_as!(
-        Variant,
-        "
-            SELECT variant.object_name
-            FROM variant INNER JOIN image ON variant.image_id = image.id
-            WHERE image.account_id = $1 AND image.id = $2 AND variant.quality = $3;
-        ",
-        account.id,
-        id,
-        params.quality.to_string()
-    )
-    .fetch_optional(&state.pool)
-    .await?;
+//     if let Some(variant) = result {
+//         let url = bucket.presign_get(
+//             format!("/{}", variant.object_name),
+//             UPLOAD_LINK_TIMEOUT_SEC,
+//             None,
+//         )?;
+//         return Ok(Redirect::temporary(&url));
+//     }
 
-    let bucket = state.bucket.lock().await;
-
-    if let Some(variant) = result {
-        let url = bucket.presign_get(
-            format!("/{}", variant.object_name),
-            UPLOAD_LINK_TIMEOUT_SEC,
-            None,
-        )?;
-        return Ok(Redirect::temporary(&url));
-    }
-
-    warn!(message = "image with requested quality doesn't exist");
-    return Err(AppError::Status(StatusCode::NOT_FOUND));
-}
+//     warn!(message = "image with requested quality doesn't exist");
+//     return Err(AppError::Status(StatusCode::NOT_FOUND));
+// }
 
 #[tracing::instrument(skip_all, fields(
     account_id = %account_id,
@@ -394,9 +420,8 @@ async fn check_image_exists(
         "
             SELECT filename
             FROM image
-            WHERE account_id = $1 AND id = $2;
+            WHERE id = $1;
         ",
-        account_id,
         image_id
     )
     .fetch_optional(pool)

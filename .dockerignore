@@ -1,2 +1,4 @@
 **/target
 **/node_modules
+images/
+images_cache/

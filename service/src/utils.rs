@@ -1,12 +1,9 @@
-use std::env;
 use std::io::Cursor;
 
-use image::DynamicImage;
 use image::codecs::jpeg::JpegEncoder;
-use rand::Rng;
+use image::DynamicImage;
 use rand::distributions::Alphanumeric;
-use s3::Bucket;
-use s3::creds::Credentials;
+use rand::Rng;
 
 use crate::error::AppError;
 
@@ -29,23 +26,6 @@ pub fn get_object_name() -> String {
         .take(OBJECT_NAME_LENGTH)
         .map(char::from)
         .collect::<String>()
-}
-
-pub fn get_bucket() -> Result<Bucket, AppError> {
-    let bucket_name = env::var("BUCKET_NAME").expect("Bucket name must be specified in the env");
-    let region_name = env::var("REGION_NAME").expect("Region must be specified in the env");
-    let endpoint = env::var("ENDPOINT").expect("Endpoint must be specified in the env");
-    let access_key = env::var("ACCESS_KEY").expect("Access key must be specified in the env");
-    let secret_key = env::var("SECRET_KEY").expect("Secret key must be specified in the env");
-
-    let region = s3::Region::Custom {
-        region: region_name,
-        endpoint,
-    };
-
-    let credentials = Credentials::new(Some(&access_key), Some(&secret_key), None, None, None)?;
-
-    Ok(Bucket::new(&bucket_name, region, credentials)?)
 }
 
 pub fn compress_image(

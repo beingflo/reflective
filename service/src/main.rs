@@ -1,16 +1,13 @@
 mod auth;
 mod error;
 mod image;
-mod s3_utils;
 mod spa;
 mod tag;
 mod utils;
-mod worker;
 
-use std::{env, sync::Arc, time::Duration};
+use std::{env, time::Duration};
 
-use async_channel::unbounded;
-use auth::{login, signup};
+use auth::login;
 use axum::{
     body::Body,
     extract::DefaultBodyLimit,
@@ -20,27 +17,24 @@ use axum::{
 };
 use dotenv::dotenv;
 use error::AppError;
-use image::{get_image, search_images, upload_image};
+use image::search_images;
 use opentelemetry::{global, trace::TracerProvider};
 use opentelemetry_sdk::trace::SdkTracerProvider;
-use s3::Bucket;
 use spa::static_handler;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use tag::{add_tags, remove_tags};
-use tokio::{signal, sync::Mutex};
+use tokio::signal;
 use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::{error, info, Span};
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
-use utils::get_bucket;
 use uuid::Uuid;
-use worker::{start_workers, ImageProcessingJob};
+
+use crate::image::scan_disk;
 
 #[derive(Clone, Debug)]
 pub struct AppState {
     pool: Pool<Postgres>,
-    bucket: Arc<Mutex<Bucket>>,
-    job_sender: async_channel::Sender<ImageProcessingJob>,
 }
 
 #[tokio::main]
@@ -72,8 +66,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!(message = "Starting application");
 
-    let bucket = get_bucket()?;
-
     let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     let pool = PgPoolOptions::new()
@@ -87,23 +79,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!(message = "Migrations applied");
 
-    // Create job queue for async image processing
-    let (job_sender, job_receiver) = unbounded::<ImageProcessingJob>();
+    let state = AppState { pool: pool.clone() };
 
-    let state = AppState {
-        pool: pool.clone(),
-        bucket: Arc::new(Mutex::new(bucket)),
-        job_sender,
-    };
+    info!(message = "Starting to scan disk for new images");
 
-    // Start background workers (default: 2 workers)
-    let worker_count = std::env::var("WORKER_COUNT")
-        .unwrap_or_else(|_| "2".to_string())
-        .parse::<usize>()
-        .unwrap_or(2);
-
-    start_workers(state.clone(), job_receiver, worker_count).await;
-    info!(message = "Started {} background workers", worker_count);
+    let scan_disk_handle = tokio::spawn(scan_disk(state.clone()));
 
     let Some((_, port)) = env::vars().find(|v| v.0.eq("SERVE_PORT")) else {
         error!("Port not present in environment");
@@ -111,11 +91,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let app = Router::new()
-        .route("/api/auth/signup", post(signup))
         .route("/api/auth/login", post(login))
-        .route("/api/images", post(upload_image))
         .route("/api/images/search", post(search_images))
-        .route("/api/images/{id}", get(get_image))
+        //.route("/api/images/{id}", get(get_image))
         .route("/api/tags", post(add_tags))
         .route("/api/tags", delete(remove_tags))
         .fallback(static_handler)
@@ -174,6 +152,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Shutdown OpenTelemetry to flush remaining traces
     provider.shutdown()?;
+
+    scan_disk_handle.abort();
 
     Ok(())
 }

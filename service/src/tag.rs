@@ -1,5 +1,5 @@
 use crate::{auth::AuthenticatedAccount, error::AppError};
-use axum::{Json, extract::State, http::StatusCode};
+use axum::{extract::State, http::StatusCode, Json};
 use serde::Deserialize;
 use sqlx::{query, query_as};
 use tracing::{error, info};
@@ -32,13 +32,9 @@ pub async fn add_tags(
     }
 
     // check if image_ids exist
-    let images = query!(
-        "SELECT id FROM image WHERE id = ANY($1) AND account_id = $2",
-        &body.image_ids,
-        account.id
-    )
-    .fetch_all(&state.pool)
-    .await?;
+    let images = query!("SELECT id FROM image WHERE id = ANY($1)", &body.image_ids,)
+        .fetch_all(&state.pool)
+        .await?;
 
     if images.len() != body.image_ids.len() {
         error!(message = "Some images do not exist");
@@ -56,10 +52,9 @@ pub async fn add_tags(
 
     for tag in &tags {
         query!(
-            "INSERT INTO tag (id, description, account_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+            "INSERT INTO tag (id, description) VALUES ($1, $2) ON CONFLICT DO NOTHING",
             Uuid::now_v7(),
             tag,
-            account.id
         )
         .execute(&mut *tx)
         .await?;

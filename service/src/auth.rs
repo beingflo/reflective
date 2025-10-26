@@ -8,7 +8,7 @@ use axum_extra::extract::{
     cookie::{self, Cookie},
     CookieJar,
 };
-use bcrypt::{hash, verify};
+use bcrypt::verify;
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, query, query_as};
 use time::Duration;
@@ -84,44 +84,6 @@ impl FromRequestParts<AppState> for AuthenticatedAccount {
             username: account.username,
         })
     }
-}
-
-#[tracing::instrument(skip_all, fields( account = %account.username ))]
-pub async fn signup(
-    State(state): State<AppState>,
-    Json(account): Json<Account>,
-) -> Result<StatusCode, AppError> {
-    let result = query_as!(
-        DBAccount,
-        "SELECT id, username, password FROM account WHERE username = $1;",
-        &account.username
-    )
-    .fetch_optional(&state.pool)
-    .await?;
-
-    // Account already exists
-    if let Some(_) = result {
-        error!(message = "Account already exists");
-        return Err(AppError::Status(StatusCode::CONFLICT));
-    };
-
-    let password = match hash(account.password, BCRYPT_COST) {
-        Ok(pw) => pw,
-        Err(_) => return Err(AppError::Status(StatusCode::INTERNAL_SERVER_ERROR)),
-    };
-
-    query!(
-        "INSERT INTO account (id, username, password) VALUES ($1, $2, $3);",
-        Uuid::now_v7(),
-        account.username,
-        password
-    )
-    .execute(&state.pool)
-    .await?;
-
-    info!(message = "Account signed up");
-
-    Ok(StatusCode::OK)
 }
 
 #[tracing::instrument(skip_all, fields( account = %account.username ))]

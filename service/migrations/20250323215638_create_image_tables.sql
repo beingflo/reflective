@@ -3,8 +3,7 @@ CREATE TABLE image (
     filename TEXT NOT NULL,
     captured_at TEXT NOT NULL,
     aspect_ratio FLOAT NOT NULL,
-    metadata TEXT,
-    account_id UUID references account(id)
+    metadata TEXT
 );
 
 CREATE TABLE variant (

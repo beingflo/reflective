@@ -6,3 +6,5 @@
 **/*.env.prod.backup
 **/*.sqlite
 **/*.DS_Store
+images/
+images_cache/

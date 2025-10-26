@@ -1,7 +1,6 @@
 CREATE TABLE tag (
     id UUID PRIMARY KEY, 
-    description TEXT NOT NULL UNIQUE,
-    account_id UUID references account(id)
+    description TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE image_tag (
