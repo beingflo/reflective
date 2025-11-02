@@ -7,6 +7,7 @@ use std::{
 use crate::{
     auth::AuthenticatedAccount,
     error::AppError,
+    tag::{add_tags, TagChangeRequest},
     utils::{compress_image, get_object_name},
 };
 use axum::{
@@ -174,6 +175,8 @@ async fn index_compressed_image(
 async fn add_image(state: &AppState, file: &DirEntry) -> Result<Uuid, AppError> {
     let image_id = Uuid::now_v7();
 
+    let images_dir = std::env::var("IMAGE_DIR").expect("IMAGE_DIR must be set");
+
     let image = ImageReader::open(file.path())?.with_guessed_format()?;
     let original_image = image.decode()?;
 
@@ -196,6 +199,38 @@ async fn add_image(state: &AppState, file: &DirEntry) -> Result<Uuid, AppError> 
                     aspect_ratio,
                     serde_json::to_string(&exif)?,
                 ).execute(&mut *tx).await;
+
+    // Add path segments to tags
+    // E.g. `/image_dir/france/lyon/test.jpeg` will get tags `france` and `lyon`
+    let relative = file
+        .path()
+        .strip_prefix(images_dir)
+        .expect("file does not have IMAGE_DIR prefix");
+    let relative = relative.parent().expect("file has no parent");
+    let folders: Vec<String> = relative
+        .components()
+        .map(|c| {
+            c.as_os_str()
+                .to_str()
+                .expect("Failed to turn Path component to string")
+                .to_string()
+        })
+        .collect();
+    match add_tags(
+        TagChangeRequest {
+            image_ids: vec![image_id],
+            tags: folders,
+        },
+        &mut tx,
+    )
+    .await
+    {
+        Ok(()) => {}
+        Err(error) => {
+            warn!(message="Adding tags failed", %image_id);
+            return Err(error);
+        }
+    };
 
     if let Err(e) = image_insert_result {
         error!(message = "failed to insert image record", error = ?e);

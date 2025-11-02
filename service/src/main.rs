@@ -22,7 +22,7 @@ use opentelemetry::{global, trace::TracerProvider};
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use spa::static_handler;
 use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
-use tag::{add_tags, remove_tags};
+use tag::remove_tags;
 use tokio::signal;
 use tower_http::{classify::ServerErrorsFailureClass, trace::TraceLayer};
 use tracing::{error, info, Span};
@@ -30,7 +30,10 @@ use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 use uuid::Uuid;
 
-use crate::image::{get_image, scan_disk};
+use crate::{
+    image::{get_image, scan_disk},
+    tag::add_tags_handler,
+};
 
 #[derive(Clone, Debug)]
 pub struct AppState {
@@ -94,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/auth/login", post(login))
         .route("/api/images/search", post(search_images))
         .route("/api/images/{id}", get(get_image))
-        .route("/api/tags", post(add_tags))
+        .route("/api/tags", post(add_tags_handler))
         .route("/api/tags", delete(remove_tags))
         .fallback(static_handler)
         .with_state(state)
