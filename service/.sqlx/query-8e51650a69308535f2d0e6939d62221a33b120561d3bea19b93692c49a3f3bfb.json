@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT image.id, image.captured_at, image.aspect_ratio, ARRAY_REMOVE( ARRAY_AGG(tag.description), NULL) tags\n            FROM image\n            LEFT JOIN image_tag ON image.id = image_tag.image_id\n            LEFT JOIN tag ON image_tag.tag_id = tag.id\n            WHERE image.account_id = $1\n            GROUP BY image.id\n            HAVING ARRAY_AGG(tag_id::text) @> ARRAY[$2::text[]];\n        ",
+  "query": "\n            SELECT image.id, image.captured_at, image.aspect_ratio, ARRAY_REMOVE( ARRAY_AGG(tag.description), NULL) tags\n            FROM image\n            LEFT JOIN image_tag ON image.id = image_tag.image_id\n            LEFT JOIN tag ON image_tag.tag_id = tag.id\n            GROUP BY image.id\n            HAVING ARRAY_AGG(tag_id::text) @> ARRAY[$1::text[]];\n        ",
   "describe": {
     "columns": [
       {
@@ -26,7 +26,6 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
         "TextArray"
       ]
     },
@@ -37,5 +36,5 @@
       null
     ]
   },
-  "hash": "a1a44627ff994f23c06af8b58774c7b2d80c406365004a406f1b61317d6d448b"
+  "hash": "8e51650a69308535f2d0e6939d62221a33b120561d3bea19b93692c49a3f3bfb"
 }

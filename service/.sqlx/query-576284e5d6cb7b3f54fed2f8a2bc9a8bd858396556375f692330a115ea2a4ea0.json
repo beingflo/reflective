@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT tag.id, tag.description\n            FROM tag\n            WHERE tag.account_id = $1;\n        ",
+  "query": "\n            SELECT tag.id, tag.description\n            FROM tag;\n        ",
   "describe": {
     "columns": [
       {
@@ -15,14 +15,12 @@
       }
     ],
     "parameters": {
-      "Left": [
-        "Uuid"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
       false
     ]
   },
-  "hash": "99f848f59f3fe4bc533e95921d3b46b90b2ec18fa4b90373b5b3b2e5d6ef8c91"
+  "hash": "576284e5d6cb7b3f54fed2f8a2bc9a8bd858396556375f692330a115ea2a4ea0"
 }

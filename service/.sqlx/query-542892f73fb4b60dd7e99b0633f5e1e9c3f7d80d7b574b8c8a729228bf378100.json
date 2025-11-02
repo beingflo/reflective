@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO image (id, filename, captured_at, aspect_ratio, metadata) VALUES ($1, $2, $3, $4, $5);",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Float8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "542892f73fb4b60dd7e99b0633f5e1e9c3f7d80d7b574b8c8a729228bf378100"
+}
