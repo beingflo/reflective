@@ -32,8 +32,6 @@ pub enum AppError {
     DateParseError(#[from] jiff::Error),
     #[error("Uuid parse error {0}")]
     UuidParseError(#[from] uuid::Error),
-    #[error("Reqwest error {0}")]
-    ReqwestError(#[from] reqwest::Error),
 }
 
 impl IntoResponse for AppError {
@@ -67,9 +65,6 @@ impl IntoResponse for AppError {
             }
             AppError::UuidParseError(error) => {
                 (StatusCode::BAD_REQUEST, error.to_string()).into_response()
-            }
-            AppError::ReqwestError(error) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response()
             }
         }
     }

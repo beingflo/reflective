@@ -30,7 +30,7 @@ use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 use uuid::Uuid;
 
-use crate::image::scan_disk;
+use crate::image::{get_image, scan_disk};
 
 #[derive(Clone, Debug)]
 pub struct AppState {
@@ -93,7 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .route("/api/auth/login", post(login))
         .route("/api/images/search", post(search_images))
-        //.route("/api/images/{id}", get(get_image))
+        .route("/api/images/{id}", get(get_image))
         .route("/api/tags", post(add_tags))
         .route("/api/tags", delete(remove_tags))
         .fallback(static_handler)

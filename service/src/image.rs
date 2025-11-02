@@ -1,4 +1,8 @@
-use std::{collections::HashMap, env, fs, io::Cursor, vec};
+use std::{
+    collections::HashMap,
+    fs::{self},
+    vec,
+};
 
 use crate::{
     auth::AuthenticatedAccount,
@@ -6,19 +10,22 @@ use crate::{
     utils::{compress_image, get_object_name},
 };
 use axum::{
-    extract::{Multipart, Path, Query, State},
-    http::StatusCode,
-    response::Redirect,
+    body::Body,
+    extract::{Path, Query, State},
+    http::{header, StatusCode},
+    response::Response,
     Json,
 };
-use exif::Exif;
 use image::{GenericImageView, ImageDecoder, ImageReader};
 use jiff::{fmt::strtime, tz, Timestamp};
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use sqlx::{query, query_as, FromRow, Pool, Postgres};
-use tokio::time::{interval, Duration};
-use tracing::{error, info, trace, warn};
+use sqlx::{query, query_as, FromRow};
+use tokio::{
+    fs::File,
+    time::{interval, Duration},
+};
+use tokio_util::io::ReaderStream;
+use tracing::{error, info, warn};
 use uuid::Uuid;
 use walkdir::{DirEntry, WalkDir};
 
@@ -372,67 +379,62 @@ pub struct QueryParams {
     quality: String,
 }
 
-// #[tracing::instrument(skip_all, fields(
-//     username = %account.username,
-//     id = %id,
-//     quality = %params.quality
-// ))]
-// pub async fn get_image(
-//     account: AuthenticatedAccount,
-//     Path(id): Path<Uuid>,
-//     params: Query<QueryParams>,
-//     State(state): State<AppState>,
-// ) -> Result<Redirect, AppError> {
-//     info!(message = "get image");
-
-//     check_image_exists(&state.pool, account.id, id).await?;
-
-//     let bucket = state.bucket.lock().await;
-
-//     if let Some(variant) = result {
-//         let url = bucket.presign_get(
-//             format!("/{}", variant.object_name),
-//             UPLOAD_LINK_TIMEOUT_SEC,
-//             None,
-//         )?;
-//         return Ok(Redirect::temporary(&url));
-//     }
-
-//     warn!(message = "image with requested quality doesn't exist");
-//     return Err(AppError::Status(StatusCode::NOT_FOUND));
-// }
-
 #[tracing::instrument(skip_all, fields(
-    account_id = %account_id,
+    username = %account.username,
     image_id = %image_id,
+    quality = %params.quality
 ))]
-async fn check_image_exists(
-    pool: &Pool<Postgres>,
-    account_id: Uuid,
-    image_id: Uuid,
-) -> Result<(), AppError> {
+pub async fn get_image(
+    account: AuthenticatedAccount,
+    Path(image_id): Path<Uuid>,
+    params: Query<QueryParams>,
+    State(state): State<AppState>,
+) -> Result<Response, AppError> {
+    info!(message = "get image");
+
     #[derive(FromRow)]
-    struct Image {
-        filename: String,
+    struct Variant {
+        object_name: String,
     }
     let result = query_as!(
-        Image,
+        Variant,
         "
-            SELECT filename
-            FROM image
-            WHERE id = $1;
+            SELECT variant.object_name
+            FROM variant INNER JOIN image ON variant.image_id = image.id
+            WHERE image.id = $1 AND variant.quality = $2;
         ",
-        image_id
+        image_id,
+        params.quality
     )
-    .fetch_optional(pool)
+    .fetch_optional(&state.pool)
     .await?;
 
-    if let Some(file) = result {
-        trace!(message = "image exists", file = %file.filename);
-        return Ok(());
+    let Some(object) = result else {
+        warn!(message = "image with requested quality doesn't exist");
+        return Err(AppError::Status(StatusCode::NOT_FOUND));
+    };
+
+    let caches_dir = std::env::var("IMAGE_CACHE_DIR").expect("IMAGE_CACHE_DIR must be set");
+    let caches_dir = std::path::Path::new(&caches_dir);
+
+    let file_path = caches_dir.join(object.object_name);
+
+    if !file_path.exists() || !file_path.is_file() {
+        error!(
+            message = "file does not exist on disk or is not file",
+            file_path = file_path.to_str()
+        );
+        return Err(AppError::Status(StatusCode::NOT_FOUND));
     }
 
-    warn!(message = "image doesn't exist");
+    let file = File::open(&file_path).await?;
 
-    return Err(AppError::Status(StatusCode::NOT_FOUND));
+    let stream = ReaderStream::new(file);
+    let body = Body::from_stream(stream);
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "image/jpeg")
+        .body(body)
+        .unwrap())
 }

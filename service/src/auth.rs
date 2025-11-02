@@ -17,7 +17,6 @@ use uuid::Uuid;
 
 use crate::AppState;
 
-const BCRYPT_COST: u32 = 12;
 const SESSION_DURATION_DAYS: i64 = 30;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -34,7 +33,6 @@ pub struct DBAccount {
 }
 
 pub struct AuthenticatedAccount {
-    pub id: Uuid,
     pub username: String,
 }
 
@@ -80,7 +78,6 @@ impl FromRequestParts<AppState> for AuthenticatedAccount {
         Span::current().record("username", account.username.to_string());
 
         Ok(AuthenticatedAccount {
-            id: account.id,
             username: account.username,
         })
     }
