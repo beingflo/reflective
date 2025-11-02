@@ -6,6 +6,9 @@ services:
       - 3005:3001
     env_file: "service/.env.prod"
     restart: unless-stopped
+    volumes:
+      - /home/florian/reflective-image-cache:reflective-image-cache
+      - /mnt/HC_Volume_103811799/reflective-images:reflective-images
     depends_on:
       - reflective-db
     networks:
