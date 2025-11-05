@@ -34,7 +34,7 @@ use crate::AppState;
 
 #[tracing::instrument(skip_all)]
 pub async fn scan_disk(state: AppState) -> Result<(), AppError> {
-    let mut interval = interval(Duration::from_secs(60));
+    let mut interval = interval(Duration::from_secs(3600));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
     loop {
