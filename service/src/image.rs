@@ -21,10 +21,7 @@ use image::{GenericImageView, ImageDecoder, ImageReader};
 use jiff::{fmt::strtime, tz, Timestamp};
 use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, FromRow};
-use tokio::{
-    fs::File,
-    time::{interval, Duration},
-};
+use tokio::fs::File;
 use tokio_util::io::ReaderStream;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -34,14 +31,11 @@ use crate::AppState;
 
 #[tracing::instrument(skip_all)]
 pub async fn scan_disk(state: AppState) -> Result<(), AppError> {
-    let mut interval = interval(Duration::from_secs(3600));
-    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    info!(message = "Starting scan for new images");
+    verify_images(&state).await?;
+    info!(message = "Finished scanning for new images");
 
-    loop {
-        interval.tick().await;
-        info!(message = "Starting scan for new images");
-        verify_images(&state).await?;
-    }
+    Ok(())
 }
 
 #[tracing::instrument(skip_all)]
