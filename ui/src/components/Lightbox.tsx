@@ -39,7 +39,7 @@ const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
   });
 
   return (
-    <div class="fixed bg-white flex w-full h-screen p-2 md:p-8 justify-center">
+    <div class="fixed bg-stone-100 flex w-full h-screen p-2 md:p-8 justify-center">
       <img
         class="h-full w-full object-contain"
         src={`/api/images/${props.imageId}?quality=medium`}
