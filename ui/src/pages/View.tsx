@@ -357,18 +357,18 @@ const View: Component = () => {
         </div>
       </Show>
       <div class="flex flex-col w-full">
-        <div class="w-full grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 p-4 gap-4 md:gap-4 md:p-8 pt-16 max-w-screen-2xl mx-auto">
+        <div class="w-full grid grid-cols-1 p-0 md:p-4 max-w-screen-xl mx-auto">
           <For each={images()}>
             {(image) => (
               <div
-                class={`w-full aspect-square ${
+                class={`w-full md:h-screen flex items-center ${
                   selectedImages().includes(image?.id) && tagMode()
                     ? 'outline outline-3 outline-offset-2 outline-blue-600'
                     : ''
                 }`}
               >
                 <img
-                  class="lazy object-cover w-full h-full"
+                  class="lazy object-cover p-8 max-h-screen mx-auto my-auto"
                   id={image?.id}
                   onClick={(e) => onClickImage(image?.id, e)}
                   data-src={`/api/images/${image?.id}?quality=small`}
