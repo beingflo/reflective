@@ -356,7 +356,7 @@ const View: Component = () => {
           </div>
         </div>
       </Show>
-      <div class="flex flex-col w-full bg-black">
+      <div class="flex flex-col w-full bg-white">
         <div class="w-full grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 p-2 md:p-4 gap-x-2 gap-y-4 max-w-screen-2xl mx-auto">
           <For each={images()}>
             {(image) => (
