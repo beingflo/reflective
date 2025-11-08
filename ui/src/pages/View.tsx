@@ -12,10 +12,9 @@ import { useStore } from '../store';
 import Lightbox from '../components/Lightbox';
 import { tinykeys } from 'tinykeys';
 import { validateEvent } from '../utils';
-import { createVisibilityObserver } from '@solid-primitives/intersection-observer';
 
 const View: Component = () => {
-  const [state, { setImages }] = useStore();
+  const [state, { setImages, appendImages }] = useStore();
   const [openImage, setOpenImage] = createSignal('');
   const [tagMode, setTagMode] = createSignal(false);
   const [searchMode, setSearchMode] = createSignal(false);
@@ -24,7 +23,13 @@ const View: Component = () => {
   const [newTagValue, setNewTagValue] = createSignal('');
   const [lastSelectedImage, setLastSelectedImage] = createSignal();
   const [selectedImages, setSelectedImages] = createSignal([]);
+  const [page, setPage] = createSignal(1);
+  const [loadingPage, setLoadingPage] = createSignal(false);
   const navigate = useNavigate();
+
+  let imagesObserver: IntersectionObserver;
+  let loadingObserver: IntersectionObserver;
+
   let searchInputRef;
 
   const images = () => {
@@ -100,6 +105,7 @@ const View: Component = () => {
   };
 
   const searchImages = async () => {
+    setLoadingPage(true);
     const response = await fetch('/api/images/search', {
       method: 'POST',
       headers: {
@@ -107,11 +113,15 @@ const View: Component = () => {
       },
       body: JSON.stringify({
         query: searchTerm(),
+        page: page(),
+        limit: 100,
       }),
-    }).catch((error) => {
-      console.error('Failed to search images:', error);
-      throw error;
-    });
+    })
+      .catch((error) => {
+        console.error('Failed to search images:', error);
+        throw error;
+      })
+      .finally(() => setLoadingPage(false));
 
     if (response.status === 401) {
       navigate('/login');
@@ -119,7 +129,8 @@ const View: Component = () => {
     }
 
     const data = await response.json();
-    setImages(data);
+    appendImages(data);
+    //setImages(data);
   };
 
   const onRemoveTag = async (tag: string) => {
@@ -254,8 +265,9 @@ const View: Component = () => {
     }
 
     let lazyloadImages = document.querySelectorAll('img');
+    let loadingRef = document.querySelector('#loading-ref');
 
-    var imageObserver = new IntersectionObserver(
+    imagesObserver = new IntersectionObserver(
       (entries, _) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) {
@@ -264,15 +276,34 @@ const View: Component = () => {
           var image = entry.target;
           image.setAttribute('src', image.getAttribute('data-src'));
           image.classList.remove('lazy');
-          imageObserver.unobserve(image);
+          imagesObserver.unobserve(image);
         });
       },
-      { rootMargin: '200%' },
+      { rootMargin: '100%' },
     );
 
     lazyloadImages.forEach(function (image) {
-      imageObserver.observe(image);
+      imagesObserver.observe(image);
     });
+
+    loadingObserver = new IntersectionObserver(
+      (entries, _) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting || loadingPage()) {
+            return;
+          }
+          setPage((page) => page + 1);
+        });
+      },
+      { rootMargin: '100%' },
+    );
+
+    loadingObserver.observe(loadingRef);
+  });
+
+  onCleanup(() => {
+    imagesObserver.disconnect();
+    loadingObserver.disconnect();
   });
 
   return (
@@ -291,7 +322,7 @@ const View: Component = () => {
         <Lightbox imageId={openImage()} images={images()} />
       </Show>
       <Show when={searchMode()}>
-        <div class="fixed top-0 w-full">
+        <div class="w-full">
           <div class="flex flex-row bg-white border-b border-black rounded-sm w-full h-12">
             <div class="pr-2 border-r border-black w-60 p-2 pt-3">
               <p class="text-sm text-gray-700">
@@ -305,7 +336,11 @@ const View: Component = () => {
                 class="p-1.5 w-full mx-1 outline-none text-xs"
                 placeholder="search"
                 autofocus
-                onInput={(e) => setSearchTerm(e.currentTarget.value)}
+                onInput={(e) => {
+                  setImages([]);
+                  setPage(1);
+                  setSearchTerm(e.currentTarget.value);
+                }}
               />
             </div>
           </div>
@@ -377,6 +412,9 @@ const View: Component = () => {
             )}
           </For>
         </div>
+      </div>
+      <div id="loading-ref" class="p-4">
+        Loading ...
       </div>
     </div>
   );

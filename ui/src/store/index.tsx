@@ -31,6 +31,11 @@ export function StoreProvider(props: StoreProviderProps) {
       setImages(images: Array<String>) {
         setState({ images });
       },
+      appendImages(images: Array<String>) {
+        setState((state) => ({
+          images: [...(state.images ?? []), ...(images ?? [])],
+        }));
+      },
       cycleScreen(screen: Screen) {
         const currentScreen = state.screen;
         let newScreen: Screen = 'app';

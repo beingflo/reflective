@@ -2,7 +2,7 @@ type: http_request
 model: http_request
 id: rq_XSQ4ykCa8k
 createdAt: 2025-02-22T13:02:24.640728
-updatedAt: 2025-11-02T19:14:21.590149
+updatedAt: 2025-11-08T15:25:12.061178
 workspaceId: wk_2iqsX2rPhP
 folderId: fl_NF56fseXRY
 authentication: {}
@@ -10,7 +10,9 @@ authenticationType: null
 body:
   text: |-
     {
-      "query": ""
+      "query": "",
+      "page": 1,
+      "limit": 100
     }
 bodyType: application/json
 description: ''

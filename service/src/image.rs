@@ -331,10 +331,15 @@ pub struct Image {
 #[derive(Deserialize)]
 pub struct SearchBody {
     query: String,
+    page: i64,
+    limit: i64,
 }
 
 #[tracing::instrument(skip_all, fields(
     username = %account.username,
+    query = %body.query,
+    page = %body.page,
+    limit = %body.limit,
 ))]
 pub async fn search_images(
     account: AuthenticatedAccount,
@@ -381,6 +386,9 @@ pub async fn search_images(
         return Ok((StatusCode::OK, Json(vec![])));
     }
 
+    let limit = body.limit;
+    let offset = (body.page - 1) * limit;
+
     let mut images = query_as!(
         Image,
         "
@@ -389,9 +397,14 @@ pub async fn search_images(
             LEFT JOIN image_tag ON image.id = image_tag.image_id
             LEFT JOIN tag ON image_tag.tag_id = tag.id
             GROUP BY image.id
-            HAVING ARRAY_AGG(tag_id::text) @> ARRAY[$1::text[]];
+            HAVING ARRAY_AGG(tag_id::text) @> ARRAY[$1::text[]]
+            ORDER BY image.captured_at DESC
+            LIMIT $2
+            OFFSET $3;
         ",
-        &tags.iter().map(|tag| tag.id.to_string()).collect::<Vec<_>>()
+        &tags.iter().map(|tag| tag.id.to_string()).collect::<Vec<_>>(),
+        limit,
+        offset
     )
     .fetch_all(&state.pool)
     .await?;
