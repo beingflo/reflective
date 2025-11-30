@@ -84,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let state = AppState { pool: pool.clone() };
 
-    info!(message = "Starting to scan disk for new images");
+    info!(message = "Starting to scan for trigger file to start disk scan");
 
     let scan_disk_handle = tokio::spawn(scan_disk(state.clone()));
 

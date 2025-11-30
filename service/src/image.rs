@@ -1,6 +1,8 @@
 use std::{
     collections::HashMap,
     fs::{self},
+    path,
+    time::Duration,
     vec,
 };
 
@@ -21,7 +23,7 @@ use image::{GenericImageView, ImageDecoder, ImageReader};
 use jiff::{fmt::strtime, tz, Timestamp};
 use serde::{Deserialize, Serialize};
 use sqlx::{query, query_as, FromRow};
-use tokio::fs::File;
+use tokio::{fs::File, time::interval};
 use tokio_util::io::ReaderStream;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -31,11 +33,19 @@ use crate::AppState;
 
 #[tracing::instrument(skip_all)]
 pub async fn scan_disk(state: AppState) -> Result<(), AppError> {
-    info!(message = "Starting scan for new images");
-    verify_images(&state).await?;
-    info!(message = "Finished scanning for new images");
+    let mut interval = interval(Duration::from_secs(5));
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
-    Ok(())
+    loop {
+        interval.tick().await;
+        let path = path::Path::new("./trigger-scan");
+
+        if path.exists() {
+            fs::remove_file(path)?;
+            info!(message = "Starting scan for new images");
+            verify_images(&state).await?;
+        }
+    }
 }
 
 #[tracing::instrument(skip_all)]
