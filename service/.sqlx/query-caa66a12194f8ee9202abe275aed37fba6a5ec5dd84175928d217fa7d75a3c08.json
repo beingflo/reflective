@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT variant.object_name, image.filename\n            FROM variant INNER JOIN image ON variant.image_id = image.id\n            WHERE image.id = $1 AND variant.quality = $2;\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "object_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "filename",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "caa66a12194f8ee9202abe275aed37fba6a5ec5dd84175928d217fa7d75a3c08"
+}
