@@ -33,7 +33,7 @@ use crate::AppState;
 
 #[tracing::instrument(skip_all)]
 pub async fn scan_disk(state: AppState) -> Result<(), AppError> {
-    let mut interval = interval(Duration::from_secs(5));
+    let mut interval = interval(Duration::from_secs(60));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
     loop {
@@ -199,7 +199,7 @@ async fn add_image(state: &AppState, file: &DirEntry) -> Result<Uuid, AppError> 
     let image_insert_result = query!(
                     "INSERT INTO image (id, filename, captured_at, aspect_ratio, metadata) VALUES ($1, $2, $3, $4, $5);",
                     image_id,
-                    file.file_name().to_str(),
+                    file.path().to_str(),
                     captured_at,
                     aspect_ratio,
                     serde_json::to_string(&exif)?,
@@ -448,11 +448,12 @@ pub async fn get_image(
     #[derive(FromRow)]
     struct Variant {
         object_name: String,
+        filename: String,
     }
     let result = query_as!(
         Variant,
         "
-            SELECT variant.object_name
+            SELECT variant.object_name, image.filename
             FROM variant INNER JOIN image ON variant.image_id = image.id
             WHERE image.id = $1 AND variant.quality = $2;
         ",
@@ -467,10 +468,13 @@ pub async fn get_image(
         return Err(AppError::Status(StatusCode::NOT_FOUND));
     };
 
-    let caches_dir = std::env::var("IMAGE_CACHE_DIR").expect("IMAGE_CACHE_DIR must be set");
-    let caches_dir = std::path::Path::new(&caches_dir);
-
-    let file_path = caches_dir.join(object.object_name);
+    let file_path = if params.quality == "original" {
+        std::path::Path::new(&object.filename).to_path_buf()
+    } else {
+        let caches_dir = std::env::var("IMAGE_CACHE_DIR").expect("IMAGE_CACHE_DIR must be set");
+        let caches_dir = std::path::Path::new(&caches_dir);
+        caches_dir.join(object.object_name)
+    };
 
     if !file_path.exists() || !file_path.is_file() {
         error!(
