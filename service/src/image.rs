@@ -38,7 +38,8 @@ pub async fn scan_disk(state: AppState) -> Result<(), AppError> {
 
     loop {
         interval.tick().await;
-        let path = path::Path::new("./trigger-scan");
+        let images_dir = std::env::var("IMAGE_DIR").expect("IMAGE_DIR must be set");
+        let path = path::Path::new(&images_dir).join("./trigger-scan");
 
         if path.exists() {
             fs::remove_file(path)?;
