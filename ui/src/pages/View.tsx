@@ -2,7 +2,7 @@ import { useNavigate } from '@solidjs/router';
 import {
   type Component,
   createEffect,
-  createMemo,
+  createResource,
   createSignal,
   For,
   onCleanup,
@@ -12,6 +12,31 @@ import { useStore } from '../store';
 import Lightbox from '../components/Lightbox';
 import { tinykeys } from 'tinykeys';
 import { validateEvent } from '../utils';
+
+const fetchImages = async ({
+  query,
+  page,
+}: {
+  query: String;
+  page: number;
+}) => {
+  const response = await fetch('/api/images/search', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      query: query,
+      page: page,
+      limit: 50,
+    }),
+  }).catch((error) => {
+    console.error('Failed to search images:', error);
+    throw error;
+  });
+
+  return response.json();
+};
 
 const View: Component = () => {
   const [state, { setImages, appendImages }] = useStore();
@@ -24,8 +49,18 @@ const View: Component = () => {
   const [lastSelectedImage, setLastSelectedImage] = createSignal();
   const [selectedImages, setSelectedImages] = createSignal([]);
   const [page, setPage] = createSignal(1);
-  const [loadingPage, setLoadingPage] = createSignal(false);
   const navigate = useNavigate();
+
+  const [data] = createResource(
+    () => ({ query: searchTerm(), page: page() }),
+    fetchImages,
+  );
+
+  createEffect(() => {
+    if (!data.loading) {
+      appendImages(data());
+    }
+  });
 
   let imagesObserver: IntersectionObserver;
   let loadingObserver: IntersectionObserver;
@@ -104,35 +139,6 @@ const View: Component = () => {
     }
   };
 
-  const searchImages = async () => {
-    setLoadingPage(true);
-    const response = await fetch('/api/images/search', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: searchTerm(),
-        page: page(),
-        limit: 100,
-      }),
-    })
-      .catch((error) => {
-        console.error('Failed to search images:', error);
-        throw error;
-      })
-      .finally(() => setLoadingPage(false));
-
-    if (response.status === 401) {
-      navigate('/login');
-      return;
-    }
-
-    const data = await response.json();
-    appendImages(data);
-    //setImages(data);
-  };
-
   const onRemoveTag = async (tag: string) => {
     const response = await fetch('/api/tags', {
       method: 'DELETE',
@@ -151,10 +157,6 @@ const View: Component = () => {
     if (response.status === 401) {
       navigate('/login');
       return;
-    }
-
-    if (response.status === 200) {
-      searchImages();
     }
   };
 
@@ -176,11 +178,6 @@ const View: Component = () => {
     if (response.status === 401) {
       navigate('/login');
       return;
-    }
-
-    if (response.status === 200) {
-      setNewTagValue('');
-      searchImages();
     }
   };
 
@@ -235,10 +232,6 @@ const View: Component = () => {
     window.scrollTo(0, 0);
   };
 
-  createEffect(async () => {
-    searchImages();
-  });
-
   const selectedImagesTags = (): Array<string> => {
     let tags = new Set();
     selectedImages().forEach((imageId) => {
@@ -265,12 +258,11 @@ const View: Component = () => {
     }
 
     let lazyloadImages = document.querySelectorAll('img');
-    let loadingRef = document.querySelector('#loading-ref');
 
     imagesObserver = new IntersectionObserver(
       (entries, _) => {
         entries.forEach((entry) => {
-          if (!entry.isIntersecting) {
+          if (!entry.isIntersecting || data.loading) {
             return;
           }
           var image = entry.target;
@@ -285,11 +277,15 @@ const View: Component = () => {
     lazyloadImages.forEach(function (image) {
       imagesObserver.observe(image);
     });
+  });
+
+  createEffect(() => {
+    let loadingRef = document.querySelector('#loading-ref');
 
     loadingObserver = new IntersectionObserver(
       (entries, _) => {
         entries.forEach((entry) => {
-          if (!entry.isIntersecting || loadingPage()) {
+          if (!entry.isIntersecting || data.loading) {
             return;
           }
           setPage((page) => page + 1);
@@ -413,9 +409,7 @@ const View: Component = () => {
           </For>
         </div>
       </div>
-      <div id="loading-ref" class="p-4">
-        Loading ...
-      </div>
+      <div id="loading-ref" class="p-4"></div>
     </div>
   );
 };
