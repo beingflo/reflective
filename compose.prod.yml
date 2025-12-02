@@ -1,6 +1,6 @@
 services:
   reflective:
-    image: "ghcr.io/beingflo/reflective:0.2.12"
+    image: "ghcr.io/beingflo/reflective:0.2.13"
     container_name: reflective
     ports:
       - 3005:3001
