@@ -12,6 +12,7 @@ import { useStore } from '../store';
 import Lightbox from '../components/Lightbox';
 import { tinykeys } from 'tinykeys';
 import { validateEvent } from '../utils';
+import { debounce } from '@solid-primitives/scheduled';
 
 const fetchImages = async ({
   query,
@@ -50,6 +51,12 @@ const View: Component = () => {
   const [selectedImages, setSelectedImages] = createSignal([]);
   const [page, setPage] = createSignal(1);
   const navigate = useNavigate();
+
+  const searchDebounced = debounce((term: string) => {
+    setImages([]);
+    setPage(1);
+    setSearchTerm(term);
+  }, 250);
 
   const [data] = createResource(
     () => ({ query: searchTerm(), page: page() }),
@@ -304,16 +311,6 @@ const View: Component = () => {
 
   return (
     <div>
-      <Show when={images().length === 0}>
-        <div class="flex w-full h-96">
-          <div class="m-auto flex flex-col gap-4">
-            <h1 class="text-4xl text-center ">No images found</h1>
-            <p class="text-center">
-              Press <span class="font-bold">cmd+u</span> to upload
-            </p>
-          </div>
-        </div>
-      </Show>
       <Show when={openImage()}>
         <Lightbox imageId={openImage()} images={images()} />
       </Show>
@@ -333,12 +330,20 @@ const View: Component = () => {
                 placeholder="search"
                 autofocus
                 onInput={(e) => {
-                  setImages([]);
-                  setPage(1);
-                  setSearchTerm(e.currentTarget.value);
+                  searchDebounced(e.currentTarget.value);
                 }}
               />
             </div>
+          </div>
+        </div>
+      </Show>
+      <Show when={images().length === 0}>
+        <div class="flex w-full h-96">
+          <div class="m-auto flex flex-col gap-4">
+            <h1 class="text-4xl text-center ">No images found</h1>
+            <p class="text-center">
+              Press <span class="font-bold">cmd+u</span> to upload
+            </p>
           </div>
         </div>
       </Show>
