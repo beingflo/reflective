@@ -49,6 +49,7 @@ const View: Component = () => {
   const [newTagValue, setNewTagValue] = createSignal('');
   const [lastSelectedImage, setLastSelectedImage] = createSignal();
   const [selectedImages, setSelectedImages] = createSignal([]);
+  const [originalQuality, setOriginalQuality] = createSignal(false);
   const [page, setPage] = createSignal(1);
   const navigate = useNavigate();
 
@@ -67,6 +68,17 @@ const View: Component = () => {
     if (!data.loading) {
       appendImages(data());
     }
+  });
+
+  const [qualityHint, setQualityHint] = createSignal(false);
+
+  const showQualityHint = () => {
+    setQualityHint(true);
+    setTimeout(() => setQualityHint(false), 500);
+  };
+
+  createEffect(() => {
+    console.log(qualityHint());
   });
 
   let imagesObserver: IntersectionObserver;
@@ -230,6 +242,12 @@ const View: Component = () => {
       }
     },
     '$mod+u': validateEvent(() => navigate('/upload')),
+    o: validateEvent(() => {
+      if (openImage()) {
+        setOriginalQuality((o) => !o);
+        showQualityHint();
+      }
+    }),
   });
 
   onCleanup(cleanup);
@@ -312,7 +330,18 @@ const View: Component = () => {
   return (
     <div>
       <Show when={openImage()}>
-        <Lightbox imageId={openImage()} images={images()} />
+        <Lightbox
+          imageId={openImage()}
+          images={images()}
+          originalQuality={originalQuality()}
+        />
+      </Show>
+      <Show when={qualityHint()}>
+        <div class="fixed bottom-2 right-2 text-xs">
+          <Show when={originalQuality()} fallback={'medium'}>
+            original
+          </Show>
+        </div>
       </Show>
       <Show when={searchMode()}>
         <div class="w-full">

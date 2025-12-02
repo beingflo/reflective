@@ -4,6 +4,7 @@ import { useStore, type Image } from '../store';
 export type LightboxProps = {
   imageId: string;
   images: Array<Image>;
+  originalQuality: boolean;
 };
 
 const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
@@ -31,10 +32,14 @@ const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
     const lastImage = props.images[currentIndex - 1];
 
     if (nextImage) {
-      new Image().src = `/api/images/${nextImage?.id}?quality=medium`;
+      new Image().src = `/api/images/${nextImage?.id}?quality=${
+        props.originalQuality ? 'original' : 'medium'
+      }`;
     }
     if (lastImage) {
-      new Image().src = `/api/images/${lastImage?.id}?quality=medium`;
+      new Image().src = `/api/images/${lastImage?.id}?quality=${
+        props.originalQuality ? 'original' : 'medium'
+      }`;
     }
   });
 
@@ -42,7 +47,9 @@ const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
     <div class="fixed bg-stone-100 flex w-full h-screen p-2 md:p-8 justify-center">
       <img
         class="h-full w-full object-contain"
-        src={`/api/images/${props.imageId}?quality=medium`}
+        src={`/api/images/${props.imageId}?quality=${
+          props.originalQuality ? 'original' : 'medium'
+        }`}
       />
     </div>
   );
