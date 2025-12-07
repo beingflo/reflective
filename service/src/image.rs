@@ -280,7 +280,7 @@ async fn image_indexed(state: &AppState, file: &DirEntry) -> Result<Option<Uuid>
             FROM image
             WHERE filename = $1 AND captured_at = $2;
         ",
-        file.file_name().to_str(),
+        file.path().to_str(),
         captured_at
     )
     .fetch_optional(&state.pool)
