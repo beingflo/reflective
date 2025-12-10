@@ -346,6 +346,13 @@ pub struct SearchBody {
     limit: i64,
 }
 
+#[derive(Serialize)]
+pub struct SearchResponse {
+    images: Vec<Image>,
+    total: i64,
+    has_more: bool,
+}
+
 #[tracing::instrument(skip_all, fields(
     username = %account.username,
     query = %body.query,
@@ -356,7 +363,7 @@ pub async fn search_images(
     account: AuthenticatedAccount,
     State(state): State<AppState>,
     body: Json<SearchBody>,
-) -> Result<(StatusCode, Json<Vec<Image>>), AppError> {
+) -> Result<(StatusCode, Json<SearchResponse>), AppError> {
     #[derive(FromRow, Debug)]
     struct Tag {
         id: Uuid,
@@ -394,7 +401,14 @@ pub async fn search_images(
     };
 
     if tags.is_empty() && body.query.len() >= 3 {
-        return Ok((StatusCode::OK, Json(vec![])));
+        return Ok((
+            StatusCode::OK,
+            Json(SearchResponse {
+                images: vec![],
+                total: 0,
+                has_more: false,
+            }),
+        ));
     }
 
     let limit = body.limit;
@@ -420,11 +434,43 @@ pub async fn search_images(
     .fetch_all(&state.pool)
     .await?;
 
+    #[derive(FromRow)]
+    struct Count {
+        count: Option<i64>,
+    }
+
+    let total_count = query_as!(
+        Count,
+        "
+        SELECT COUNT(image.id) as count
+        FROM image
+        LEFT JOIN image_tag ON image.id = image_tag.image_id
+        LEFT JOIN tag ON image_tag.tag_id = tag.id
+        HAVING ARRAY_AGG(tag_id::text) @> ARRAY[$1::text[]]
+        ;
+    ",
+        &tags
+            .iter()
+            .map(|tag| tag.id.to_string())
+            .collect::<Vec<_>>()
+    )
+    .fetch_one(&state.pool)
+    .await?;
+
     images.sort_by(|a, b| b.captured_at.cmp(&a.captured_at));
 
     info!(message = "load image list", number_of_files = images.len());
 
-    Ok((StatusCode::OK, Json(images)))
+    let total = total_count.count.unwrap_or_default();
+
+    Ok((
+        StatusCode::OK,
+        Json(SearchResponse {
+            images,
+            total,
+            has_more: body.page * body.limit <= total,
+        }),
+    ))
 }
 
 #[derive(Deserialize, Debug)]

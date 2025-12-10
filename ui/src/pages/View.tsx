@@ -66,7 +66,7 @@ const View: Component = () => {
 
   createEffect(() => {
     if (!data.loading) {
-      appendImages(data());
+      appendImages(data().images);
     }
   });
 
@@ -76,10 +76,6 @@ const View: Component = () => {
     setQualityHint(true);
     setTimeout(() => setQualityHint(false), 500);
   };
-
-  createEffect(() => {
-    console.log(qualityHint());
-  });
 
   let imagesObserver: IntersectionObserver;
   let loadingObserver: IntersectionObserver;
@@ -310,7 +306,7 @@ const View: Component = () => {
     loadingObserver = new IntersectionObserver(
       (entries, _) => {
         entries.forEach((entry) => {
-          if (!entry.isIntersecting || data.loading) {
+          if (!entry.isIntersecting || data.loading || !data().has_more) {
             return;
           }
           setPage((page) => page + 1);
@@ -348,7 +344,7 @@ const View: Component = () => {
           <div class="flex flex-row bg-white border-b border-black rounded-sm w-full h-12">
             <div class="pr-2 border-r border-black w-60 p-2 pt-3">
               <p class="text-sm text-gray-700">
-                matched images: {images().length}
+                matched images: {data().total}
               </p>
             </div>
             <div class="p-2 flex w-full flex-row items-start">
