@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(DISTINCT image.id) as count\n        FROM image\n        LEFT JOIN image_tag ON image.id = image_tag.image_id\n        WHERE image.id IN (\n            SELECT image_id \n            FROM image_tag\n            GROUP BY image_id\n            HAVING ARRAY_AGG(tag_id::text) @> ARRAY[$1::text[]]\n        );\n        ;\n    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "56514e47b57726e58714dba993c6c2ae7bda7ab3243d4fc60542ca88d1f2fb78"
+}

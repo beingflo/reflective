@@ -442,11 +442,15 @@ pub async fn search_images(
     let total_count = query_as!(
         Count,
         "
-        SELECT COUNT(image.id) as count
+        SELECT COUNT(DISTINCT image.id) as count
         FROM image
         LEFT JOIN image_tag ON image.id = image_tag.image_id
-        LEFT JOIN tag ON image_tag.tag_id = tag.id
-        HAVING ARRAY_AGG(tag_id::text) @> ARRAY[$1::text[]]
+        WHERE image.id IN (
+            SELECT image_id 
+            FROM image_tag
+            GROUP BY image_id
+            HAVING ARRAY_AGG(tag_id::text) @> ARRAY[$1::text[]]
+        );
         ;
     ",
         &tags
