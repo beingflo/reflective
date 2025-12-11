@@ -45,12 +45,6 @@ const Login: Component = () => {
         <p class="text-4xl md:text-6xl mb-4 text-black dark:text-white font-extrabold">
           Login
         </p>
-        <a
-          href="/signup"
-          class="text-md md:text-lg text-gray-800 dark:text-white w-fit h-fit"
-        >
-          Signup
-        </a>
       </div>
       <form onSubmit={submit} class="w-full flex flex-col gap-6 mt-12">
         <Show when={error()}>
