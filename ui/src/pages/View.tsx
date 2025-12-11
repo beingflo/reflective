@@ -14,31 +14,6 @@ import { tinykeys } from 'tinykeys';
 import { validateEvent } from '../utils';
 import { debounce } from '@solid-primitives/scheduled';
 
-const fetchImages = async ({
-  query,
-  page,
-}: {
-  query: String;
-  page: number;
-}) => {
-  const response = await fetch('/api/images/search', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      query: query,
-      page: page,
-      limit: 50,
-    }),
-  }).catch((error) => {
-    console.error('Failed to search images:', error);
-    throw error;
-  });
-
-  return response.json();
-};
-
 const View: Component = () => {
   const [state, { setImages, appendImages }] = useStore();
   const [openImage, setOpenImage] = createSignal('');
@@ -58,6 +33,36 @@ const View: Component = () => {
     setPage(1);
     setSearchTerm(term);
   }, 250);
+
+  const fetchImages = async ({
+    query,
+    page,
+  }: {
+    query: String;
+    page: number;
+  }) => {
+    const response = await fetch('/api/images/search', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: query,
+        page: page,
+        limit: 50,
+      }),
+    }).catch((error) => {
+      console.error('Failed to search images:', error);
+      throw error;
+    });
+
+    if (response.status === 401) {
+      navigate('/login/');
+      return;
+    }
+
+    return response.json();
+  };
 
   const [data] = createResource(
     () => ({ query: searchTerm(), page: page() }),
@@ -319,8 +324,8 @@ const View: Component = () => {
   });
 
   onCleanup(() => {
-    imagesObserver.disconnect();
-    loadingObserver.disconnect();
+    imagesObserver?.disconnect();
+    loadingObserver?.disconnect();
   });
 
   return (
