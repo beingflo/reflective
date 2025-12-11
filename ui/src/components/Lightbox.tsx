@@ -4,6 +4,7 @@ import { useStore, type Image } from '../store';
 export type LightboxProps = {
   imageId: string;
   images: Array<Image>;
+  close: () => void;
   originalQuality: boolean;
 };
 
@@ -45,6 +46,12 @@ const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
 
   return (
     <div class="fixed bg-stone-100 flex w-full h-screen p-2 md:p-8 justify-center">
+      <button
+        onClick={props.close}
+        class="md:hidden absolute top-2 right-4 p-4"
+      >
+        x
+      </button>
       <img
         class="h-full w-full object-contain"
         src={`/api/images/${props.imageId}?quality=${

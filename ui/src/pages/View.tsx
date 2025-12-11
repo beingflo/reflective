@@ -334,6 +334,7 @@ const View: Component = () => {
         <Lightbox
           imageId={openImage()}
           images={images()}
+          close={closeLightbox}
           originalQuality={originalQuality()}
         />
       </Show>
