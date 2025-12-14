@@ -52,7 +52,7 @@ const View: Component = () => {
       body: JSON.stringify({
         query: query,
         page: page,
-        limit: 50,
+        limit: 20,
       }),
     }).catch((error) => {
       console.error('Failed to search images:', error);
