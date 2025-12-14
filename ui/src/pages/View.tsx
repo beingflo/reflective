@@ -13,6 +13,7 @@ import Lightbox from '../components/Lightbox';
 import { tinykeys } from 'tinykeys';
 import { validateEvent } from '../utils';
 import { debounce } from '@solid-primitives/scheduled';
+import { createMediaQuery } from '@solid-primitives/media';
 
 const View: Component = () => {
   const [state, { setImages, appendImages }] = useStore();
@@ -27,6 +28,8 @@ const View: Component = () => {
   const [originalQuality, setOriginalQuality] = createSignal(false);
   const [page, setPage] = createSignal(1);
   const navigate = useNavigate();
+
+  const isMobile = createMediaQuery('(max-width: 767px)');
 
   const searchDebounced = debounce((term: string) => {
     setImages([]);
@@ -345,7 +348,7 @@ const View: Component = () => {
           </Show>
         </div>
       </Show>
-      <Show when={searchMode()}>
+      <Show when={searchMode() || isMobile()}>
         <div class="w-full">
           <div class="flex flex-row bg-white border-b border-black rounded-sm w-full h-12">
             <div class="pr-2 border-r border-black w-60 p-2 pt-3">
