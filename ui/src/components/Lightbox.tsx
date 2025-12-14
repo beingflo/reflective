@@ -1,5 +1,5 @@
 import { createEffect, type Component } from 'solid-js';
-import { useStore, type Image } from '../store';
+import { type Image } from '../store';
 
 export type LightboxProps = {
   imageId: string;
@@ -9,23 +9,7 @@ export type LightboxProps = {
 };
 
 const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
-  const [, { setImages }] = useStore();
-
-  // Fetch images in case of reload
-  createEffect(async () => {
-    if (props.images.length === 0) {
-      const response = await fetch('/api/images', {
-        headers: {
-          'content-type': 'application/json',
-        },
-      }).then((response) => response.json());
-
-      setImages(response);
-    }
-  });
-
   createEffect(() => {
-    // todo, shouldn't be state.images but images from list above
     const currentIndex = props.images.findIndex(
       (image) => image.id === props.imageId,
     );
@@ -44,6 +28,11 @@ const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
     }
   });
 
+  const imageUrl = () =>
+    `/api/images/${props.imageId}?quality=${
+      props.originalQuality ? 'original' : 'medium'
+    }`;
+
   return (
     <div class="fixed bg-stone-100 flex w-full h-screen p-2 md:p-8 justify-center">
       <button
@@ -52,12 +41,7 @@ const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
       >
         x
       </button>
-      <img
-        class="h-full w-full object-contain"
-        src={`/api/images/${props.imageId}?quality=${
-          props.originalQuality ? 'original' : 'medium'
-        }`}
-      />
+      <img class="h-full w-full object-contain" src={imageUrl()} />
     </div>
   );
 };

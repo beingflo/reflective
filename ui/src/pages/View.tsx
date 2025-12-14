@@ -100,13 +100,21 @@ const View: Component = () => {
 
   const goToNextImage = () => {
     if (!openImage()) return;
+
     const currentIndex = images().findIndex(
       (image) => image.id === openImage(),
     );
+
     const nextImage = images()[currentIndex + 1];
 
     if (nextImage) {
       setOpenImage(nextImage?.id);
+    }
+
+    if (currentIndex >= images().length - 10) {
+      if (!data.loading && data().has_more) {
+        setPage((page) => page + 1);
+      }
     }
   };
 
