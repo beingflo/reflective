@@ -353,7 +353,7 @@ const View: Component = () => {
           <div class="flex flex-row bg-white border-b border-black rounded-sm w-full h-12">
             <div class="pr-2 border-r border-black w-60 p-2 pt-3">
               <p class="text-sm text-gray-700">
-                matched images: {data().total}
+                matched images: {data()?.total}
               </p>
             </div>
             <div class="p-2 flex w-full flex-row items-start">
