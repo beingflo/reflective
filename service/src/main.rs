@@ -31,7 +31,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 use uuid::Uuid;
 
 use crate::{
-    image::{get_image, scan_disk},
+    image::{get_image, get_image_metadata, scan_disk},
     tag::add_tags_handler,
 };
 
@@ -97,6 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/auth/login", post(login))
         .route("/api/images/search", post(search_images))
         .route("/api/images/{id}", get(get_image))
+        .route("/api/images/{id}/metadata", get(get_image_metadata))
         .route("/api/tags", post(add_tags_handler))
         .route("/api/tags", delete(remove_tags))
         .fallback(static_handler)

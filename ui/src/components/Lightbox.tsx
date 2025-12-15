@@ -1,10 +1,12 @@
-import { createEffect, type Component } from 'solid-js';
+import { createEffect, Show, type Component } from 'solid-js';
 import { type Image } from '../store';
 
 export type LightboxProps = {
   imageId: string;
   images: Array<Image>;
   close: () => void;
+  showMetadata: boolean;
+  metadata: Object;
   originalQuality: boolean;
 };
 
@@ -41,7 +43,13 @@ const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
       >
         x
       </button>
-      <img class="h-full w-full object-contain" src={imageUrl()} />
+      <div>
+        <Show when={props.showMetadata}>
+          {props.metadata?.['Make']?.replaceAll('"', '')}
+          {props.metadata?.['Model']?.replaceAll('"', '')}
+        </Show>
+        <img class="h-full w-full object-contain" src={imageUrl()} />
+      </div>
     </div>
   );
 };

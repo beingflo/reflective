@@ -19,6 +19,7 @@ const View: Component = () => {
   const [state, { setImages, appendImages }] = useStore();
   const [openImage, setOpenImage] = createSignal('');
   const [tagMode, setTagMode] = createSignal(false);
+  const [showMetadata, setShowMetadata] = createSignal(false);
   const [searchMode, setSearchMode] = createSignal(false);
   const [emptyTagMode, setEmptyTagMode] = createSignal(false);
   const [searchTerm, setSearchTerm] = createSignal('');
@@ -70,6 +71,31 @@ const View: Component = () => {
   const [data] = createResource(
     () => ({ query: searchTerm(), page: page() }),
     fetchImages,
+  );
+
+  const fetchMetadata = async ({ id }: { id: String }) => {
+    const response = await fetch(`/api/images/${id}/metadata`, {
+      method: 'GET',
+    }).catch((error) => {
+      console.error('Failed to load metadata:', error);
+      throw error;
+    });
+
+    if (response.status === 401) {
+      navigate('/login/');
+      return;
+    }
+
+    return response.json();
+  };
+
+  const [metadata] = createResource(
+    () => ({ id: openImage() }),
+    (id) => {
+      if (showMetadata()) {
+        return fetchMetadata(id);
+      }
+    },
   );
 
   createEffect(() => {
@@ -246,6 +272,10 @@ const View: Component = () => {
       event.preventDefault();
       setEmptyTagMode((prev) => !prev);
     },
+    '$mod+i': (event) => {
+      event.preventDefault();
+      setShowMetadata((prev) => !prev);
+    },
     '$mod+k': (event) => {
       if (!openImage()) {
         event.preventDefault();
@@ -346,6 +376,8 @@ const View: Component = () => {
           imageId={openImage()}
           images={images()}
           close={closeLightbox}
+          showMetadata={showMetadata()}
+          metadata={metadata()}
           originalQuality={originalQuality()}
         />
       </Show>

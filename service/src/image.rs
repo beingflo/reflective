@@ -22,6 +22,7 @@ use axum::{
 use image::{GenericImageView, ImageDecoder, ImageReader};
 use jiff::{fmt::strtime, tz, Timestamp};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sqlx::{query, query_as, FromRow};
 use tokio::{fs::File, time::interval};
 use tokio_util::io::ReaderStream;
@@ -544,4 +545,41 @@ pub async fn get_image(
         .header(header::CONTENT_TYPE, "image/jpeg")
         .body(body)
         .unwrap())
+}
+
+#[tracing::instrument(skip_all, fields(
+    username = %account.username,
+    image_id = %image_id,
+))]
+pub async fn get_image_metadata(
+    account: AuthenticatedAccount,
+    Path(image_id): Path<Uuid>,
+    State(state): State<AppState>,
+) -> Result<Json<Value>, AppError> {
+    info!(message = "get image metadata");
+
+    #[derive(FromRow)]
+    struct Metadata {
+        metadata: Option<String>,
+    }
+    let result = query_as!(
+        Metadata,
+        "
+            SELECT metadata
+            FROM image
+            WHERE image.id = $1
+        ",
+        image_id,
+    )
+    .fetch_optional(&state.pool)
+    .await?;
+
+    let Some(object) = result else {
+        warn!(message = "image doesn't exist");
+        return Err(AppError::Status(StatusCode::NOT_FOUND));
+    };
+
+    let response = serde_json::from_str(&object.metadata.unwrap_or_default()).unwrap_or_default();
+
+    Ok(Json(response))
 }
