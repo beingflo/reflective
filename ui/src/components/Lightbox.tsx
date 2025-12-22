@@ -44,11 +44,20 @@ const Lightbox: Component<LightboxProps> = (props: LightboxProps) => {
         x
       </button>
       <div>
-        <Show when={props.showMetadata}>
-          {props.metadata?.['Make']?.replaceAll('"', '')}
-          {props.metadata?.['Model']?.replaceAll('"', '')}
-        </Show>
         <img class="h-full w-full object-contain" src={imageUrl()} />
+        <Show when={props.showMetadata}>
+          <div class="w-full flex flex-row justify-between">
+            <p>
+              {props.metadata?.['Make']?.replaceAll('"', '')}{' '}
+              {props.metadata?.['Model']?.replaceAll('"', '')}
+            </p>
+            <p>{props.metadata?.['ExposureTime']}s</p>
+            <p>f/{props.metadata?.['FNumber']}</p>
+            <p>{props.metadata?.['FocalLength']}mm</p>
+            <p>ISO {props.metadata?.['PhotographicSensitivity']}</p>
+            <p>{props.metadata?.['DateTimeOriginal']}</p>
+          </div>
+        </Show>
       </div>
     </div>
   );

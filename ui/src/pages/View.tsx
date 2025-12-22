@@ -73,7 +73,7 @@ const View: Component = () => {
     fetchImages,
   );
 
-  const fetchMetadata = async ({ id }: { id: String }) => {
+  const fetchMetadata = async (id: String) => {
     const response = await fetch(`/api/images/${id}/metadata`, {
       method: 'GET',
     }).catch((error) => {
@@ -90,9 +90,9 @@ const View: Component = () => {
   };
 
   const [metadata] = createResource(
-    () => ({ id: openImage() }),
-    (id) => {
-      if (showMetadata()) {
+    () => ({ id: openImage(), _: showMetadata() }),
+    ({ id }) => {
+      if (showMetadata() && id) {
         return fetchMetadata(id);
       }
     },
