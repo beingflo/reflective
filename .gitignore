@@ -2,8 +2,6 @@
 **/dist
 **/target
 **/*.env
-**/*.env.prod
-**/*.env.prod.backup
 **/*.sqlite
 **/*.DS_Store
 images/
